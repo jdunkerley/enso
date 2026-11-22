@@ -59,6 +59,11 @@ add_specs suite_builder =
             twice = Widget.Single_Choice [Choice.Option "A" "..A" [["x", Widget.Column_Name from="right"], ["y", Widget.Column_Name from="right"]]]
             twice.column_sources . should_equal ["right"]
 
+        group_builder.specify "column_sources looks into the kinds of a Union" <|
+            union = Widget.Union [Pair.new "Text" Widget.Text_Input, Pair.new "Column" (Widget.Column_Name from="right")] include_nothing=True
+            union.column_sources . should_equal ["right"]
+            (Widget.Union [Pair.new "Text" Widget.Text_Input]).column_sources . should_equal []
+
     suite_builder.group "Widget to_json" group_builder->
         group_builder.specify "widget JSON carries no display or label" <|
             json = (Widget.Single_Choice [Choice.Option "A" "'A'"]).to_json
@@ -67,6 +72,23 @@ add_specs suite_builder =
             json . should_not_contain '"display"'
             json . should_not_contain '"label":null'
             (Widget.Text_Input).to_json . should_equal '{"constructor":"Text_Input"}'
+
+        group_builder.specify "a Union lists its kinds in order, each with its widget" <|
+            union = Widget.Union [Pair.new "Text" Widget.Text_Input, Pair.new "Integer" Widget.Numeric_Input] include_nothing=True
+            union.to_json . should_equal '{"constructor":"Union","kinds":[["Text",{"constructor":"Text_Input"}],["Integer",{"constructor":"Numeric_Input"}]],"include_nothing":true}'
+
+        group_builder.specify "a Union without Nothing says so" <|
+            union = Widget.Union [Pair.new "Locale" (Widget.Single_Choice [Choice.Option "A" "'A'"])]
+            json = union.to_json . parse_json
+            json.get "include_nothing" . should_be_false
+            json.get "kinds" . first . first . should_equal "Locale"
+
+        group_builder.specify "a Regex_Input" <| Widget.Regex_Input.to_json . should_equal '{"constructor":"Regex_Input"}'
+
+        group_builder.specify "a Union nests inside a Vector_Editor" <|
+            union = Widget.Union [Pair.new "Text" Widget.Text_Input] include_nothing=True
+            editor = Widget.Vector_Editor item_editor=union item_default="''"
+            editor.to_json . should_contain '"item_editor":{"constructor":"Union"'
 
     suite_builder.group "File_Format.dropdown_options" group_builder->
         group_builder.specify "names a registered format's type and file patterns" <|

@@ -9,6 +9,7 @@ import {
 import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
 import {
   defaultItemCode,
+  vectorItemDefault,
   vectorElementType,
   vectorItemConfig,
 } from '@/components/GraphEditor/widgets/WidgetVector/elementType'
@@ -63,7 +64,7 @@ const itemConfig = computed(() =>
 const defaultItem = computed(() => {
   if (props.input.dynamicConfig?.kind === 'Vector_Editor')
     return Ast.parseExpression(props.input.dynamicConfig.item_default) ?? DEFAULT_ITEM.value
-  const typed = defaultItemCode(itemType.value)
+  const typed = vectorItemDefault(itemConfig.value) ?? defaultItemCode(itemType.value)
   return (typed != null ? Ast.parseExpression(typed) : undefined) ?? DEFAULT_ITEM.value
 })
 

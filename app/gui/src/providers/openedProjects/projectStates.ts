@@ -37,6 +37,7 @@ import { SchemaCache } from './widgetRegistry/columnPickers'
 import {
   TypeDefaults,
   chooseComputedFrame,
+  convertsBetween,
   hasWidgetConversion,
 } from './widgetRegistry/typeDefaults'
 
@@ -223,6 +224,7 @@ export function useProjectStates() {
           )
         },
         project.info.id,
+        (source, target) => convertsBetween(suggestionDb.entries, source, target),
       )
       onScopeDispose(() => typeDefaults.dispose())
       const schemaCache = new SchemaCache()

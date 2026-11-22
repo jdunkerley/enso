@@ -2342,6 +2342,427 @@ test.describe('Type defaults from the library', () => {
   })
 })
 
+test.describe('Kind picker', () => {
+  const T = 'Standard.Base.Data'
+  const INTEGER = `${T}.Numbers.Integer`
+  const TEXT = `${T}.Text.Text`
+  const NOTHING = 'Standard.Base.Nothing.Nothing'
+  const REGEX = `${T}.Text.Regex.Regex`
+  const SECRET = 'Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret'
+  const FILE = 'Standard.Base.System.File.File'
+  const LOCALE = `${T}.Locale.Locale`
+
+  test.afterEach(restoreMockMainFile)
+  test.afterEach(restoreMockWidgetConfigurations)
+  test.use({
+    setupApi: {
+      local: () =>
+        setMockMainFile(
+          [
+            'from Standard.Base import Data',
+            '',
+            'main =',
+            '    intn = Data.int_nothing',
+            '    textn = Data.text_nothing',
+            "    textint = Data.text_int 'a'",
+            "    textre = Data.text_regex 'a.*c'",
+            "    textsec = Data.text_secret 'pw'",
+            '    loc = Data.locale_nothing',
+            '    rd = Data.read',
+            '    tfn = Data.text_file_nothing',
+            '    annot = Data.annotated',
+            "    vec = Data.vec_items ['a', 1]",
+            '',
+          ].join('\n'),
+        ),
+    },
+  })
+
+  function unionMethod(
+    name: string,
+    reprType: string,
+    options: { annotations?: string[]; defaultValue?: string } = {},
+  ) {
+    return {
+      type: 'method' as const,
+      module: T,
+      name,
+      arguments: [
+        {
+          name: 'value',
+          reprType,
+          isSuspended: false,
+          hasDefault: options.defaultValue != null,
+          ...(options.defaultValue != null ? { defaultValue: options.defaultValue } : {}),
+        },
+      ],
+      selfType: T,
+      returnType: INTEGER,
+      isStatic: true,
+      annotations: options.annotations ?? [],
+    }
+  }
+
+  /** The node bound to `binding`, calling `method` whose only argument is not applied (or is, if `applied`). */
+  async function kindNode(
+    editorPage: EditorPageActions,
+    page: Page,
+    binding: string,
+    method: ReturnType<typeof unionMethod>,
+    applied = false,
+  ) {
+    await editorPage.mockSuggestion(method)
+    await mockMethodCallInfo(page, binding, {
+      methodPointer: { module: T, definedOnType: T, name: method.name },
+      notAppliedArguments: applied ? [] : [0],
+    })
+    const node = locate.graphNodeByBinding(page, binding)
+    await expect(node.locator('.WidgetKindPicker').first()).toBeVisible()
+    return node
+  }
+
+  async function select(page: Page, node: locate.Node) {
+    await locate.graphNodeIcon(node).click()
+    await expect(node).toBeSelected()
+  }
+
+  const changeKind = (node: Locator, name: string) =>
+    node.getByRole('button', { name: `${name}, change kind` })
+  const list = (page: Page) => new DropDownLocator(page.locator('body'))
+  /** The argument's name, and the chip directly after it (in front of the value). */
+  const argumentName = (node: Locator) => node.locator('.WidgetArgumentName > .name')
+  const chipAfterName = (node: Locator) => node.locator('.WidgetArgumentName > .name + .KindChip')
+
+  test('Integer | Nothing: unselected shows only the icon, which does not open anything', async ({
+    editorPage,
+    page,
+  }) => {
+    const node = await kindNode(
+      editorPage,
+      page,
+      'intn',
+      unionMethod('int_nothing', `${INTEGER} | ${NOTHING}`),
+    )
+    await expect(node.locator('.kindIcon')).toBeVisible()
+    await expect(argumentName(node)).toHaveText('value')
+    await expect(chipAfterName(node)).toHaveCount(1)
+    await expect(node.getByRole('button', { name: /change kind/ })).toHaveCount(0)
+    await node.locator('.kindIcon').click({ force: true })
+    await expect(node).toBeSelected()
+    // Selected by that click: the icon is now a button, and no list opened by itself.
+    await expect(changeKind(node, 'Integer')).toBeVisible()
+    await expect(list(page).dropDownAnyState).toHaveCount(0)
+  })
+
+  test('Integer | Nothing: choosing Nothing writes Nothing, which is a button only while selected', async ({
+    editorPage,
+    page,
+  }) => {
+    const node = await kindNode(
+      editorPage,
+      page,
+      'intn',
+      unionMethod('int_nothing', `${INTEGER} | ${NOTHING}`),
+    )
+    await select(page, node)
+    await changeKind(node, 'Integer').click()
+    await expect(changeKind(node, 'Integer')).toHaveAttribute('aria-expanded', 'true')
+    const dropdown = list(page)
+    await dropdown.expectVisibleWithOptions(['Integer', 'Nothing'])
+    await expect(dropdown.items.first().locator('svg')).toHaveCount(1)
+    await dropdown.clickOption('Nothing')
+    await expect(changeKind(node, 'Nothing')).toBeVisible()
+    await expect(node.locator('.kindIcon, .kindSymbol')).toHaveCount(0)
+    // The name stays, and the Nothing button stands in for the value right after it.
+    await expect(argumentName(node)).toHaveText('value')
+    await expect(
+      chipAfterName(node).getByRole('button', { name: 'Nothing, change kind' }),
+    ).toBeVisible()
+    await expect(node.locator('.WidgetArgumentName')).toHaveText(/^\s*value\s*Nothing\s*$/)
+    expect(await moduleCode(page)).toContain('intn = Data.int_nothing Nothing\n')
+    await actions.clickAtBackground(page)
+    await expect(node).not.toBeSelected()
+    await expect(argumentName(node)).toHaveText('value')
+    await expect(node.getByRole('button', { name: /change kind/ })).toHaveCount(0)
+    await expect(node.locator('.WidgetKindPicker')).toContainText('Nothing')
+    await expect(node.locator('.kindIcon')).toHaveCount(0)
+  })
+
+  test('keyboard: Enter opens, ArrowDown and Enter pick Nothing, Escape closes', async ({
+    editorPage,
+    page,
+  }) => {
+    const node = await kindNode(
+      editorPage,
+      page,
+      'intn',
+      unionMethod('int_nothing', `${INTEGER} | ${NOTHING}`),
+    )
+    await select(page, node)
+    await changeKind(node, 'Integer').focus()
+    await page.keyboard.press('Enter')
+    const dropdown = list(page)
+    await dropdown.expectVisible()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+    await dropdown.expectNotVisible()
+    await expect(changeKind(node, 'Nothing')).toBeFocused()
+    expect(await moduleCode(page)).toContain('intn = Data.int_nothing Nothing\n')
+    await changeKind(node, 'Nothing').press('Enter')
+    await dropdown.expectVisible()
+    await page.keyboard.press('Escape')
+    await dropdown.expectNotVisible()
+    await expect(changeKind(node, 'Nothing')).toBeFocused()
+  })
+
+  test('Text | Nothing with a default of Nothing: the added argument is an explicit Nothing, and Text and back write code', async ({
+    editorPage,
+    page,
+  }) => {
+    await editorPage.mockSuggestion(
+      unionMethod('text_nothing', `${TEXT} | ${NOTHING}`, { defaultValue: 'Nothing' }),
+    )
+    await mockMethodCallInfo(page, 'textn', {
+      methodPointer: { module: T, definedOnType: T, name: 'text_nothing' },
+      notAppliedArguments: [0],
+    })
+    // An argument with a default is hidden until it is added through the ＋ menu.
+    const node = locate.graphNodeByBinding(page, 'textn')
+    await actions.addArgument(page, node, 'value')
+    await expect(changeKind(node, 'Nothing')).toBeVisible()
+    await expect(argumentName(node)).toHaveText('value')
+    expect(await moduleCode(page)).toContain('textn = Data.text_nothing value=Nothing\n')
+    await changeKind(node, 'Nothing').click()
+    await list(page).clickOption('Text')
+    await expect(changeKind(node, 'Text')).toBeVisible()
+    expect(await moduleCode(page)).toContain("textn = Data.text_nothing value=''\n")
+    await changeKind(node, 'Text').click()
+    await list(page).clickOption('Nothing')
+    await expect(changeKind(node, 'Nothing')).toBeVisible()
+    expect(await moduleCode(page)).toContain('textn = Data.text_nothing value=Nothing\n')
+  })
+
+  const heightOf = async (locator: Locator) => (await locator.boundingBox())?.height ?? NaN
+
+  test('the kind button is as high as a value chip, and selecting does not change the node height', async ({
+    editorPage,
+    page,
+  }) => {
+    const node = await kindNode(
+      editorPage,
+      page,
+      'textint',
+      unionMethod('text_int', `${TEXT} | ${INTEGER}`),
+      true,
+    )
+    const textChip = node.locator('.WidgetText').first()
+    const unselectedNode = await heightOf(node)
+    // The faint icon, unselected, is already a chip's height.
+    expect(
+      Math.abs((await heightOf(node.locator('.kindIcon'))) - (await heightOf(textChip))),
+    ).toBeLessThan(1)
+    await select(page, node)
+    expect(Math.abs((await heightOf(node)) - unselectedNode)).toBeLessThan(1)
+    // The icon form.
+    const button = changeKind(node, 'Text')
+    expect(Math.abs((await heightOf(button)) - (await heightOf(textChip)))).toBeLessThan(1)
+    // The Nothing form, beside a number chip.
+    const intNode = await kindNode(
+      editorPage,
+      page,
+      'intn',
+      unionMethod('int_nothing', `${INTEGER} | ${NOTHING}`),
+    )
+    const intUnselected = await heightOf(intNode)
+    await select(page, intNode)
+    const numberChip = intNode.locator('.NumericInputWidget').first()
+    await expect(numberChip).toBeVisible()
+    const numberHeight = await heightOf(numberChip)
+    await changeKind(intNode, 'Integer').click()
+    await list(page).clickOption('Nothing')
+    const nothing = changeKind(intNode, 'Nothing')
+    await expect(nothing).toBeVisible()
+    expect(Math.abs((await heightOf(nothing)) - numberHeight)).toBeLessThan(1)
+    expect(Math.abs((await heightOf(intNode)) - intUnselected)).toBeLessThan(1)
+  })
+
+  test('switching kind is one undo step', async ({ editorPage, page }) => {
+    const node = await kindNode(
+      editorPage,
+      page,
+      'textint',
+      unionMethod('text_int', `${TEXT} | ${INTEGER}`),
+      true,
+    )
+    await expect(node.locator('.kindIcon')).toHaveAttribute('title', 'Text')
+    await select(page, node)
+    await changeKind(node, 'Text').click()
+    await list(page).clickOption('Integer')
+    await expect(changeKind(node, 'Integer')).toBeVisible()
+    expect(await moduleCode(page)).toContain('textint = Data.text_int 0\n')
+    await page.keyboard.press('ControlOrMeta+Z')
+    await expect(changeKind(node, 'Text')).toBeVisible()
+    expect(await moduleCode(page)).toContain("textint = Data.text_int 'a'\n")
+  })
+
+  test('Text | Regex: switching writes regex, whose pattern is edited in place', async ({
+    editorPage,
+    page,
+  }) => {
+    const node = await kindNode(
+      editorPage,
+      page,
+      'textre',
+      unionMethod('text_regex', `${TEXT} | ${REGEX}`),
+      true,
+    )
+    await expect(node.locator('.kindIcon')).toHaveAttribute('title', 'Text')
+    await select(page, node)
+    await changeKind(node, 'Text').click()
+    await list(page).clickOption('Regex')
+    await expect(changeKind(node, 'Regex')).toBeVisible()
+    expect(await moduleCode(page)).toContain("textre = Data.text_regex (regex '.*')\n")
+    await expect(argumentName(node)).toHaveText('value')
+    await expect(chipAfterName(node)).toHaveCount(1)
+    // The node still shows the code, not a stand-in for it.
+    await expect(node).toContainText(/regex\W*\.\*/)
+    const pattern = node.locator('.WidgetRegex').getByTestId('widget-text-content')
+    await expect(pattern).toHaveText('.*')
+    await pattern.click()
+    await page.keyboard.press('ControlOrMeta+A')
+    await page.keyboard.insertText('a+')
+    await page.keyboard.press('Enter')
+    await expect(node).toContainText(/regex\W*a\+/)
+    expect(await moduleCode(page)).toContain("textre = Data.text_regex (regex 'a+')\n")
+  })
+
+  test('Text | Enso_Secret: switching writes Enso_Secret.get with the secret browser beside the key', async ({
+    editorPage,
+    page,
+  }) => {
+    const node = await kindNode(
+      editorPage,
+      page,
+      'textsec',
+      unionMethod('text_secret', `${TEXT} | ${SECRET}`),
+      true,
+    )
+    await expect(node.locator('.kindIcon')).toHaveAttribute('title', 'Text')
+    await select(page, node)
+    await changeKind(node, 'Text').click()
+    await list(page).clickOption('Enso_Secret')
+    await expect(changeKind(node, 'Enso_Secret')).toBeVisible()
+    const code = await moduleCode(page)
+    expect(code).toContain("textsec = Data.text_secret (Enso_Secret.get '')\n")
+    expect(code).toContain('Enso_Secret')
+    await expect(node).toContainText(/Enso_Secret\W*get/)
+    await expect(node.locator('.WidgetKindPicker .WidgetSelection')).toHaveCount(1)
+  })
+
+  test('Locale | Nothing is one dropdown with a Nothing entry and no chip', async ({
+    editorPage,
+    page,
+  }) => {
+    await editorPage.mockSuggestion(unionMethod('locale_nothing', `${LOCALE} | ${NOTHING}`))
+    await mockMethodCallInfo(page, 'loc', {
+      methodPointer: { module: T, definedOnType: T, name: 'locale_nothing' },
+      notAppliedArguments: [0],
+    })
+    const node = locate.graphNodeByBinding(page, 'loc')
+    await expect(node.locator('.WidgetSelection')).toHaveCount(1)
+    await expect(node.locator('.WidgetKindPicker')).toHaveCount(0)
+    await expect(node.locator('.kindIcon')).toHaveCount(0)
+    await select(page, node)
+    await expect(node.getByRole('button', { name: /change kind/ })).toHaveCount(0)
+    const dropdown = new DropDownLocator(node)
+    await dropdown.clickWidget()
+    await dropdown.expectVisibleWithOptions(['US', 'UK', 'Nothing'])
+  })
+
+  test("Data.read's path keeps its file browser and has no chip", async ({ page, editorPage }) => {
+    await editorPage
+    await mockMethodCallInfo(page, 'rd', {
+      methodPointer: { module: T, definedOnType: T, name: 'read' },
+      notAppliedArguments: [0, 1, 2],
+    })
+    const node = locate.graphNodeByBinding(page, 'rd')
+    const pathArg = node.locator('.WidgetTopLevelArgument').filter({ has: page.getByText('path') })
+    await expect(pathArg).toHaveCount(1)
+    await expect(node.locator('.WidgetKindPicker')).toHaveCount(0)
+    const pathDropdown = new DropDownLocator(pathArg)
+    await pathArg.click()
+    await pathDropdown.expectVisibleWithOptions([...CHOOSE_FILE_OPTIONS, 'File 1', 'File 2'])
+    await expect(node.getByRole('button', { name: /change kind/ })).toHaveCount(0)
+  })
+
+  test('Text | File | Nothing offers File and Nothing, with the file browser beside the icon', async ({
+    editorPage,
+    page,
+  }) => {
+    const node = await kindNode(
+      editorPage,
+      page,
+      'tfn',
+      unionMethod('text_file_nothing', `${TEXT} | ${FILE} | ${NOTHING}`),
+    )
+    await expect(node.locator('.kindIcon')).toHaveAttribute('title', 'File')
+    await expect(node.locator('.WidgetKindPicker .WidgetSelection')).toHaveCount(1)
+    await select(page, node)
+    await changeKind(node, 'File').click()
+    await list(page).expectVisibleWithOptions(['File', 'Nothing'])
+  })
+
+  test('an annotation wins over the picker', async ({ editorPage, page, localApi }) => {
+    await editorPage.mockSuggestion(
+      unionMethod('annotated', `${INTEGER} | ${NOTHING}`, { annotations: ['value'] }),
+    )
+    await localApi.updateVisualization('.annotated', [
+      [
+        'value',
+        {
+          type: 'Widget',
+          constructor: 'Single_Choice',
+          values: [
+            { type: 'Choice', constructor: 'Option', value: '1', label: 'One', parameters: [] },
+            { type: 'Choice', constructor: 'Option', value: '2', label: 'Two', parameters: [] },
+          ],
+        },
+      ],
+    ])
+    await mockMethodCallInfo(page, 'annot', {
+      methodPointer: { module: T, definedOnType: T, name: 'annotated' },
+      notAppliedArguments: [0],
+    })
+    const node = locate.graphNodeByBinding(page, 'annot')
+    await expect(node.locator('.WidgetSelection')).toHaveCount(1)
+    await expect(node.locator('.WidgetKindPicker')).toHaveCount(0)
+    await select(page, node)
+    await expect(node.getByRole('button', { name: /change kind/ })).toHaveCount(0)
+  })
+
+  test('Vector (Text | Integer): every item has an icon and + adds an empty text', async ({
+    editorPage,
+    page,
+  }) => {
+    const node = await kindNode(
+      editorPage,
+      page,
+      'vec',
+      unionMethod('vec_items', `${T}.Vector.Vector (${TEXT} | ${INTEGER})`),
+      true,
+    )
+    const vector = node.locator('.WidgetVector')
+    await expect(vector.locator('.item')).toHaveCount(2)
+    await expect(vector.locator('.kindIcon')).toHaveCount(2)
+    await expect(vector.locator('.kindIcon').first()).toHaveAttribute('title', 'Text')
+    await expect(vector.locator('.kindIcon').last()).toHaveAttribute('title', 'Integer')
+    await node.click()
+    await locate.addItemButton(node).click()
+    await expect(vector.locator('.item')).toHaveCount(3)
+    expect(await moduleCode(page)).toContain("vec = Data.vec_items ['a', 1, '']\n")
+  })
+})
+
 test.describe('Column pickers', () => {
   const ANY_TYPE = 'Standard.Base.Any.Any'
   test.afterEach(restoreMockMainFile)

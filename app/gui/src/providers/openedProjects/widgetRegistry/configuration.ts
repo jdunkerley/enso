@@ -105,6 +105,8 @@ export type WidgetConfiguration =
   | TimeInput
   | SecretBrowse
   | AnyToTarget
+  | RegexInput
+  | UnionConfig
   | FunctionCall
   | OneOfFunctionCalls
   | SomeOfFunctionCalls
@@ -234,6 +236,22 @@ export interface AnyToTarget {
   kind: 'Any_To_Target'
 }
 
+export interface RegexInput {
+  kind: 'Regex_Input'
+}
+
+/** One kind of a union: its label and the widget of a value of that kind (`null`: `Nothing`). */
+export interface UnionKind {
+  label: string
+  config: WidgetConfiguration | null
+}
+
+export interface UnionConfig {
+  kind: 'Union'
+  /** In picker order; `Nothing`, when included, is the last entry with `config: null`. */
+  kinds: UnionKind[]
+}
+
 /**
  * Dynamic configuration for a function call with a list of arguments with known dynamic configuration.
  * This kind of config is not provided by the engine directly, but is derived from other config types by widgets.
@@ -283,65 +301,92 @@ const widgetColumnsSchema = z.object({
   type_names: z.array(z.string()),
 })
 
+/** The engine's `Widget.Union`: `kinds` as `[label, widget]` pairs and `include_nothing`. */
+interface RawUnion {
+  kind: 'Union'
+  kinds: [string, WidgetConfiguration][]
+  include_nothing?: boolean | undefined
+}
+
+function toUnionConfig({ kinds, include_nothing: includeNothing }: RawUnion): UnionConfig {
+  return {
+    kind: 'Union',
+    kinds: [
+      ...kinds.map(([label, config]): UnionKind => ({ label, config })),
+      ...(includeNothing ? [{ label: 'Nothing', config: null }] : []),
+    ],
+  }
+}
+
 export const widgetConfigurationSchema: z.ZodType<WidgetConfiguration, z.ZodTypeDef, any> =
-  withKindSchema.pipe(
-    /* eslint-disable camelcase */
-    z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('Single_Choice'), values: z.array(choiceSchema) }),
-      z.object({
-        kind: z.literal('Vector_Editor'),
-        item_editor: z.lazy(() => widgetConfigurationSchema),
-        item_default: z.string(),
-      }),
-      z.object({ kind: z.literal('Multiple_Choice'), values: z.array(choiceSchema) }),
-      z.object({ kind: z.literal('Boolean_Input') }),
-      z.object({
-        kind: z.literal('Numeric_Input'),
-        maximum: z.number().optional(),
-        minimum: z.number().optional(),
-      }),
-      z.object({ kind: z.literal('Text_Input'), syntax: z.string().optional() }),
-      z.object({ kind: z.literal('Folder_Browse') }),
-      z.object({
-        kind: z.literal('File_Browse'),
-        existing_only: z.boolean().optional(),
-        action: z.enum(['Open', 'Save']).optional(),
-        file_types: z.array(fileTypeSchema),
-      }),
-      z.object({ kind: z.literal('Date_Input') }),
-      z.object({ kind: z.literal('Date_Time_Input') }),
-      z.object({ kind: z.literal('Time_Input') }),
-      z.object({ kind: z.literal('Secret_Browse') }),
-      z.object({ kind: z.literal('Any_To_Target') }),
-      z.object({
-        kind: z.literal('Column_Name'),
-        kinds: z.array(columnKindSchema),
-        from: z.string().nullable(),
-        expression: z.boolean(),
-        reference: z.boolean(),
-        extra: z.array(choiceSchema),
-        columns_first: z.boolean(),
-      }),
-      z.object({
-        kind: z.literal('Column_Names'),
-        kinds: z.array(columnKindSchema),
-        from: z.string().nullable(),
-        regex: z.boolean(),
-        by_type: z.boolean(),
-      }),
-      z.object({
-        kind: z.literal('Column_Vector'),
-        kinds: z.array(columnKindSchema),
-        from: z.string().nullable(),
-      }),
-      z.object({
-        kind: z.literal('Order_By'),
-        from: z.string().nullable(),
-        name_only: z.boolean(),
-      }),
-      /* eslint-enable camelcase */
-    ]),
-  )
+  withKindSchema
+    .pipe(
+      /* eslint-disable camelcase */
+      z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('Single_Choice'), values: z.array(choiceSchema) }),
+        z.object({
+          kind: z.literal('Vector_Editor'),
+          item_editor: z.lazy(() => widgetConfigurationSchema),
+          item_default: z.string(),
+        }),
+        z.object({ kind: z.literal('Multiple_Choice'), values: z.array(choiceSchema) }),
+        z.object({ kind: z.literal('Boolean_Input') }),
+        z.object({
+          kind: z.literal('Numeric_Input'),
+          maximum: z.number().optional(),
+          minimum: z.number().optional(),
+        }),
+        z.object({ kind: z.literal('Text_Input'), syntax: z.string().optional() }),
+        z.object({ kind: z.literal('Folder_Browse') }),
+        z.object({
+          kind: z.literal('File_Browse'),
+          existing_only: z.boolean().optional(),
+          action: z.enum(['Open', 'Save']).optional(),
+          file_types: z.array(fileTypeSchema),
+        }),
+        z.object({ kind: z.literal('Date_Input') }),
+        z.object({ kind: z.literal('Date_Time_Input') }),
+        z.object({ kind: z.literal('Time_Input') }),
+        z.object({ kind: z.literal('Secret_Browse') }),
+        z.object({ kind: z.literal('Any_To_Target') }),
+        z.object({ kind: z.literal('Regex_Input') }),
+        z.object({
+          kind: z.literal('Union'),
+          kinds: z.array(z.tuple([z.string(), z.lazy(() => widgetConfigurationSchema)])),
+          include_nothing: z.boolean().optional(),
+        }),
+        z.object({
+          kind: z.literal('Column_Name'),
+          kinds: z.array(columnKindSchema),
+          from: z.string().nullable(),
+          expression: z.boolean(),
+          reference: z.boolean(),
+          extra: z.array(choiceSchema),
+          columns_first: z.boolean(),
+        }),
+        z.object({
+          kind: z.literal('Column_Names'),
+          kinds: z.array(columnKindSchema),
+          from: z.string().nullable(),
+          regex: z.boolean(),
+          by_type: z.boolean(),
+        }),
+        z.object({
+          kind: z.literal('Column_Vector'),
+          kinds: z.array(columnKindSchema),
+          from: z.string().nullable(),
+        }),
+        z.object({
+          kind: z.literal('Order_By'),
+          from: z.string().nullable(),
+          name_only: z.boolean(),
+        }),
+        /* eslint-enable camelcase */
+      ]),
+    )
+    .transform((config): WidgetConfiguration =>
+      config.kind === 'Union' ? toUnionConfig(config as RawUnion) : (config as WidgetConfiguration),
+    )
 
 const argNameSchema = z.string()
 const argumentSchema = z.tuple([argNameSchema, widgetConfigurationSchema.nullable()])

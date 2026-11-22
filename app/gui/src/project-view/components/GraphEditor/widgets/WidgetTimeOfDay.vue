@@ -12,13 +12,11 @@ import {
   unparenthesisedCode,
 } from '@/components/GraphEditor/widgets/WidgetPicker/parentheses'
 import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
-import {
-  isWholeNodeCall,
-  type CallShapes,
-} from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
+import { isWholeNodeCall } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import TimeOfDayMenu from '@/components/GraphEditor/widgets/WidgetTimeOfDay/TimeOfDayMenu.vue'
 import {
+  TIME_CALLS,
   parseTimeExpression,
   timeExpressionCode,
   withKeptParts,
@@ -64,8 +62,6 @@ function choose(picked: TimeChoice, done: () => void) {
 </script>
 
 <script lang="ts">
-const TIME_CALLS: CallShapes = { bare: ['Time_Of_Day.now'], applied: ['Time_Of_Day.new'] }
-
 function isTimeTyped(input: WidgetInput): boolean {
   return input.dynamicConfig?.kind === 'Time_Input'
 }

@@ -546,6 +546,16 @@ const initialMockTypeDefaults: Record<string, unknown> = {
     widget: { ...fileBrowse, existing_only: false, action: 'Save' },
   },
   'Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret': { widget: { constructor: 'Secret_Browse' } },
+  [`${typeBase}.Text.Regex.Regex`]: { widget: { constructor: 'Regex_Input' } },
+  [`${typeBase}.Locale.Locale`]: {
+    widget: {
+      constructor: 'Single_Choice',
+      values: [
+        { constructor: 'Option', value: 'Locale.us', label: 'US', parameters: [] },
+        { constructor: 'Option', value: 'Locale.uk', label: 'UK', parameters: [] },
+      ],
+    },
+  },
 }
 
 /* eslint-enable camelcase */

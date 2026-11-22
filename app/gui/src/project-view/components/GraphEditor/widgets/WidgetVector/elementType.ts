@@ -1,7 +1,9 @@
 /** @file The element type of a `Vector`-typed argument, so each item gets the widget its type asks for. */
 import type { WidgetConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
+import { unionMembers } from '$/providers/openedProjects/widgetRegistry/unionKinds'
 import { DATE_TYPE } from '@/components/GraphEditor/widgets/WidgetDate/dateExpression'
 import { DATE_TIME_TYPE } from '@/components/GraphEditor/widgets/WidgetDateTime/dateTimeExpression'
+import { kindDefaultCode } from '@/components/GraphEditor/widgets/WidgetKindPicker/kindMatch'
 import { TIME_OF_DAY_TYPE } from '@/components/GraphEditor/widgets/WidgetTimeOfDay/timeExpression'
 
 /**
@@ -24,8 +26,9 @@ const VECTOR_TYPE = 'Standard.Base.Data.Vector.Vector'
 /**
  * The element type of a vector type as the language server reports it: `Vector Date` arrives as
  * `Standard.Base.Data.Vector.Vector Standard.Base.Data.Time.Date.Date`, possibly in parentheses.
- * Only a single named element type counts; a bare `Vector`, a union, or a nested application gives
- * `undefined`, and the items are drawn as before.
+ * A single named element type counts, and so does a parenthesised union of them (`Vector (A | B)`
+ * gives `A | B`); a bare `Vector` or a nested application gives `undefined`, and the items are drawn
+ * as before.
  */
 export function vectorElementType(type: string | undefined): string | undefined {
   if (type == null) return undefined
@@ -33,7 +36,13 @@ export function vectorElementType(type: string | undefined): string | undefined 
   while (reprType.startsWith('(') && reprType.endsWith(')')) reprType = reprType.slice(1, -1).trim()
   if (!reprType.startsWith(VECTOR_TYPE + ' ')) return undefined
   const element = reprType.slice(VECTOR_TYPE.length + 1).trim()
-  return /^[\w.]+$/.test(element) ? element : undefined
+  if (/^[\w.]+$/.test(element)) return element
+  if (!element.startsWith('(') || !element.endsWith(')')) return undefined
+  const inner = element.slice(1, -1).trim()
+  const members = unionMembers(inner)
+  return members.length > 1 && members.every((member) => /^[\w.]+$/.test(member)) ?
+      inner
+    : undefined
 }
 
 /**
@@ -46,4 +55,20 @@ export function vectorItemConfig(
   typeDefault: (reprType: string | undefined) => WidgetConfiguration | undefined,
 ): WidgetConfiguration | undefined {
   return itemEditor ?? typeDefault(elementType)
+}
+
+/**
+ * The code a new item starts as, from the item widget's configuration: a union's first kind that
+ * has one, else what the widget kind itself starts as.
+ */
+export function vectorItemDefault(config: WidgetConfiguration | undefined): string | undefined {
+  if (config == null) return undefined
+  if (config.kind === 'Union') {
+    for (const kind of config.kinds) {
+      const code = kindDefaultCode(kind.config)
+      if (code != null) return code
+    }
+    return undefined
+  }
+  return kindDefaultCode(config)
 }
