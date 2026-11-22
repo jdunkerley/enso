@@ -71,6 +71,17 @@ add_specs suite_builder =
             expect = answer "column" (Widget.Column_Name expression=True) columns_json
             Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
 
+        group_builder.specify "aggregate offers numeric columns to Sum and text columns to Concatenate" <|
+            json = Widget_Query.resolve_call mock_table table_module table_type "aggregate" ["columns"]
+            sum = Option "..Sum" "..Sum" [["column", Widget.Column_Name kinds=[Column_Kind.Numeric] expression=True]]
+            json.contains sum.to_json . should_be_true
+            json.contains (Widget.Column_Name kinds=[Column_Kind.Textual] expression=True).to_json . should_be_true
+
+        group_builder.specify "text-only methods offer text columns" <|
+            ["parse", "fill_empty", "text_replace", "text_cleanse"].each method->
+                json = Widget_Query.resolve_call mock_table table_module table_type method ["columns"] . parse_json
+                json.get "arguments" . first . second . get "widget" . get "kinds" . should_equal ["Textual"]
+
         group_builder.specify "works for `update_rows`, a Database extension method" <|
             json = Widget_Query.resolve_call mock_table "Standard.Database.Extensions.Upload_Table" table_type "update_rows" ["key_columns"] . parse_json
             json.get "arguments" . first . second . get "widget" . get "constructor" . should_equal "Column_Vector"

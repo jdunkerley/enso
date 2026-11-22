@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+import Standard.Base.Metadata.Column_Kind.Column_Kind
 import Standard.Base.Metadata.Widget
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Single_Choice, Vector_Editor
@@ -88,11 +89,12 @@ type Simple_Expression
     default_widget table:Table_Ref -> Widget =
         with_everything = Widget_Helpers.make_column_ref_by_name_selector table add_text=True add_number=True add_boolean=True add_date=True add_time=True add_date_time=True add_nothing=True
         with_number_text = Widget_Helpers.make_column_ref_by_name_selector table add_text=True add_number=True
+        with_add_number_text = Widget_Helpers.make_column_ref_by_name_selector table add_text=True add_number=True kinds=[Column_Kind.Numeric, Column_Kind.Textual]
         filter_cond = Widget_Helpers.make_filter_condition_selector table
 
         options = Vector.build builder->
             builder.append (Option "copy" "..Copy")
-            builder.append (Option "add" "..Add" [["rhs", with_number_text]])
+            builder.append (Option "add" "..Add" [["rhs", with_add_number_text]])
             builder.append (Option "format" "..Format" [["format", make_format_chooser include_number=True]])
             builder.append (Option "if" "..If" [["condition", filter_cond], ["true_value", with_everything], ["false_value", with_everything]])
             builder.append (Option "min" "..Min" [["rhs", with_number_text]])
@@ -167,8 +169,8 @@ type Text_Operation
        ---
     create_widget : Table_Ref -> Widget
     create_widget table:Table_Ref =
-        with_number = Widget_Helpers.make_column_ref_by_name_selector table add_number=True
-        with_text = Widget_Helpers.make_column_ref_by_name_selector table add_text=True
+        with_number = Widget_Helpers.make_column_ref_by_name_selector table add_number=True kinds=[Column_Kind.Numeric]
+        with_text = Widget_Helpers.make_column_ref_by_name_selector table add_text=True kinds=[Column_Kind.Textual]
 
         options = Vector.build builder->
             builder.append (Option "left" "..Left" [["length", with_number]])
@@ -259,10 +261,11 @@ type Math_Operation
        ---
     create_widget : Table_Ref -> Widget
     create_widget table:Table_Ref =
-        with_number = Widget_Helpers.make_column_ref_by_name_selector table add_number=True
+        with_number = Widget_Helpers.make_column_ref_by_name_selector table add_number=True kinds=[Column_Kind.Numeric]
+        with_subtract = Widget_Helpers.make_column_ref_by_name_selector table add_number=True kinds=[Column_Kind.Numeric, Column_Kind.Date_Only, Column_Kind.Date_And_Time, Column_Kind.Time_Only]
 
         options = Vector.build builder->
-            builder.append (Option "subtract" "..Subtract" [["rhs", with_number]])
+            builder.append (Option "subtract" "..Subtract" [["rhs", with_subtract]])
             builder.append (Option "multiply" "..Multiply" [["rhs", with_number]])
             builder.append (Option "divide" "..Divide" [["rhs", with_number]])
             builder.append (Option "negate" "..Negate")
@@ -341,8 +344,8 @@ type Date_Operation
        ---
     create_widget : Table_Ref -> Widget
     create_widget table:Table_Ref =
-        with_number = Widget_Helpers.make_column_ref_by_name_selector table add_number=True
-        with_date = Widget_Helpers.make_column_ref_by_name_selector table add_date=True add_date_time=True
+        with_number = Widget_Helpers.make_column_ref_by_name_selector table add_number=True kinds=[Column_Kind.Numeric]
+        with_date = Widget_Helpers.make_column_ref_by_name_selector table add_date=True add_date_time=True kinds=[Column_Kind.Date_Only, Column_Kind.Date_And_Time, Column_Kind.Time_Only]
 
         options = Vector.build builder->
             builder.append (Option "add" "..Add" [["length", with_number]])
@@ -399,7 +402,7 @@ type Logical_Operation
        ---
     create_widget : Table_Ref -> Widget
     create_widget table:Table_Ref =
-        with_boolean = Widget_Helpers.make_column_ref_by_name_selector table add_boolean=True
+        with_boolean = Widget_Helpers.make_column_ref_by_name_selector table add_boolean=True kinds=[Column_Kind.Logical]
 
         options = Vector.build builder->
             builder.append (Option "not" "..Not")

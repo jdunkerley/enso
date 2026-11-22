@@ -14,6 +14,7 @@ import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Unimplemented.Unimplemented
 import Standard.Base.Logging.Log_Level
 import Standard.Base.Logging.Progress
+import Standard.Base.Metadata.Column_Kind.Column_Kind
 import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 import Standard.Base.Runtime.State
 import Standard.Base.System.File.Generic.Writable_File.Writable_File
@@ -1705,7 +1706,7 @@ type Table
        Scientific notation is only allowed on decimals and must be on a value
        between -10 and 10. The notation is an `E` followed by an integer and must
        be enabled on a `Data_Formatter`.
-    @columns (Widget.Column_Names regex=True)
+    @columns (Widget.Column_Names kinds=[Column_Kind.Textual] regex=True)
     @type Widget_Helpers.parse_type_selector
     @format Widget_Helpers.make_format_chooser_for_parse
     parse self (columns : Table_Selector = self.columns . filter (c-> c.value_type.is_text) . map .name) (type : Value_Type | Auto = Auto) (format : Text | Data_Formatter = '') error_on_missing_columns:Boolean=True on_problems:Problem_Behavior=..Report_Warning -> Table & Any = _profile_time_execution "Table.parse" <|
@@ -1723,7 +1724,7 @@ type Table
         - `columns`: The columns to parse.
         - `on_problems`: Specifies how to handle if a problem occurs, raising as
           a warning by default.
-    @columns (Widget.Column_Names regex=True)
+    @columns (Widget.Column_Names kinds=[Column_Kind.Textual] regex=True)
     parse_json self (columns : Table_Selector = Missing_Argument.throw "columns") error_on_missing_columns:Boolean=True on_problems:Problem_Behavior=..Report_Warning -> Table & Any ! Invalid_JSON | Illegal_Argument = _profile_time_execution "Table.parse_json" <|
         columns.act_if_any self error_on_missing_columns selected->
             selected.fold self current->column_name->
@@ -2044,7 +2045,7 @@ type Table
        ## Errors
         - If the data exceeds the `column_count`, a `Column_Count_Exceeded` will
           be reported according to the `on_problems` behavior.
-    @columns (Widget.Column_Names regex=True by_type=True)
+    @columns (Widget.Column_Names kinds=[Column_Kind.Textual] regex=True by_type=True)
     @delimiter make_delimiter_selector
     split_to_columns self (columns : Table_Selector = Missing_Argument.throw "columns") (delimiter : Text | Vector = Missing_Argument.throw "delimiter") column_count:Columns_To_Add=..All_Columns on_problems:Problem_Behavior=..Report_Warning error_on_missing_columns:Boolean=True -> Table & Any = _profile_time_execution "Table.split_to_columns" <|
         columns.act_if_any self error_on_missing_columns selected->
@@ -2066,7 +2067,7 @@ type Table
        ## Arguments
         - `column`: The name or index of the column to split the text of.
         - `delimiter`: The term or terms used to split the text.
-    @column (Widget.Column_Name)
+    @column (Widget.Column_Name kinds=[Column_Kind.Textual])
     @delimiter make_delimiter_selector
     split_to_rows self (column : Text | Integer = Missing_Argument.throw "column") (delimiter : Text | Vector = Missing_Argument.throw "delimiter") -> Table & Any = _profile_time_execution "Table.split_to_rows" <|
         self.implementation.split_to_rows self.underlying column delimiter
@@ -2100,7 +2101,7 @@ type Table
        ## Errors
         - If the data exceeds the `column_count`, a `Column_Count_Exceeded` will
           be reported according to the `on_problems` behavior.
-    @columns (Widget.Column_Names regex=True by_type=True)
+    @columns (Widget.Column_Names kinds=[Column_Kind.Textual] regex=True by_type=True)
     tokenize_to_columns self (columns : Table_Selector = Missing_Argument.throw "columns") (pattern : Text = Missing_Argument.throw "pattern") case_sensitivity:Case_Sensitivity=..Sensitive column_count:Columns_To_Add=..All_Columns on_problems:Problem_Behavior=..Report_Warning error_on_missing_columns:Boolean=True -> Table & Any = _profile_time_execution "Table.tokenize_to_columns" <|
         columns.act_if_any self error_on_missing_columns selected->
             selected.fold self current->column_name->
@@ -2129,7 +2130,7 @@ type Table
           still produce at least one row, with `Nothing` for the output column
           values. Equivalent to converting a tokenization output of [] to
           [Nothing].
-    @column (Widget.Column_Name)
+    @column (Widget.Column_Name kinds=[Column_Kind.Textual])
     tokenize_to_rows self (column : Text | Integer = Missing_Argument.throw "column") (pattern : Text = Missing_Argument.throw "pattern") case_sensitivity:Case_Sensitivity=..Sensitive at_least_one_row:Boolean=False -> Table & Any = _profile_time_execution "Table.tokenize_to_rows" <|
         self.implementation.tokenize_to_rows self.underlying column pattern case_sensitivity at_least_one_row
 
@@ -2162,7 +2163,7 @@ type Table
        marked group.
        If the new name is already in use it will be renamed following the normal
        suffixing strategy.
-    @column (Widget.Column_Name)
+    @column (Widget.Column_Name kinds=[Column_Kind.Textual])
     @pattern Widget.Text_Input
     parse_to_columns self (column : Text | Integer = Missing_Argument.throw "column") (pattern : Text | Regex = Missing_Argument.throw "pattern") case_sensitivity:Case_Sensitivity=..Sensitive parse_values:Boolean=True on_problems:Problem_Behavior=..Report_Error -> Table & Any = _profile_time_execution "Table.parse_to_columns" <|
         self.implementation.parse_to_columns self.underlying column pattern case_sensitivity parse_values on_problems
@@ -3742,7 +3743,7 @@ type Table
        ```
              fill_empty = table.fill_empty ["col0", "col1"] "hello"
        ```
-    @columns (Widget.Column_Names regex=True by_type=True)
+    @columns (Widget.Column_Names kinds=[Column_Kind.Textual] regex=True by_type=True)
     @default (self-> Widget_Helpers.make_fill_default_value_selector self value_types=Value_Type.Char add_nothing=True)
     fill_empty self (columns : Table_Selector = Missing_Argument.throw "columns") (default : Column | Column_Ref | Expression | Previous_Value | Any = Missing_Argument.throw "default") error_on_missing_columns:Boolean=True -> Table & Any = _profile_time_execution "Table.fill_empty" <|
         columns.act_if_any self error_on_missing_columns selected->
@@ -3796,9 +3797,9 @@ type Table
        ```
              table.text_replace ["Input"] '"(.*?)"'.to_regex '($1)'
        ```
-    @columns (Widget.Column_Names regex=True by_type=True)
-    @term (Widget_Helpers.make_column_ref_by_name_selector add_regex=True add_text=True add_named_pattern=True)
-    @new_text (Widget_Helpers.make_column_ref_by_name_selector add_text=True)
+    @columns (Widget.Column_Names kinds=[Column_Kind.Textual] regex=True by_type=True)
+    @term (Widget_Helpers.make_column_ref_by_name_selector add_regex=True add_text=True add_named_pattern=True kinds=[Column_Kind.Textual])
+    @new_text (Widget_Helpers.make_column_ref_by_name_selector add_text=True kinds=[Column_Kind.Textual])
     text_replace self (columns : Table_Selector = Missing_Argument.throw "columns") (term : Text | Column | Column_Ref | Expression | Regex = "") (new_text : Text | Column | Column_Ref | Expression = "") case_sensitivity:Case_Sensitivity=..Sensitive only_first:Boolean=False error_on_missing_columns:Boolean=True -> Table & Any = _profile_time_execution "Table.text_replace" <|
         columns.act_if_any self error_on_missing_columns selected->
             self.implementation.text_replace self.underlying selected term new_text case_sensitivity only_first
@@ -3855,7 +3856,7 @@ type Table
                |-------|
                | Hello |
                | World |
-    @columns (Widget.Column_Names regex=True by_type=True)
+    @columns (Widget.Column_Names kinds=[Column_Kind.Textual] regex=True by_type=True)
     @remove make_data_cleanse_vector_selector
     text_cleanse self (columns : Table_Selector = (Missing_Argument.throw "columns")) (remove : Vector Named_Pattern = []) error_on_missing_columns:Boolean=True -> Table & Any = _profile_time_execution "Table.text_cleanse" <|
         columns.act_if_any self error_on_missing_columns selected->

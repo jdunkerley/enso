@@ -47,6 +47,18 @@ add_specs suite_builder =
             widget.get "expression" . should_be_true
             json.get "columns" . get "" . get "names" . should_equal ["A", "B"]
 
+        group_builder.specify "Spatial_Table's pickers offer the kinds the method accepts" <|
+            spatial = "Standard.Table.Spatial_Table"
+            spatial_type = "Standard.Table.Spatial_Table.Spatial_Table"
+            kinds_of method argument =
+                json = Widget_Query.resolve_call table spatial spatial_type method [argument] . parse_json
+                json.get "arguments" . first . second . get "widget" . get "kinds"
+            kinds_of "st_point" "longitude" . should_equal ["Numeric"]
+            kinds_of "st_point" "latitude" . should_equal ["Numeric"]
+            kinds_of "st_from_geojson" "column" . should_equal ["Textual"]
+            kinds_of "st_from_wkt" "column" . should_equal ["Textual"]
+            kinds_of "st_convex_hull" "column" . should_equal ["Other"]
+
         group_builder.specify "the `range` of Column.take, Column.drop, Table.take and Table.drop" <|
             ["take", "drop"].each method->
                 column_json = Widget_Query.resolve_call column column_module column_type method ["range"]

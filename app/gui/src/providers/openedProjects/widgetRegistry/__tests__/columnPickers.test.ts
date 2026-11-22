@@ -56,6 +56,11 @@ test('kinds filter, Other always offered', () => {
   ])
 })
 
+test('kinds of only Other lists just the Other columns', () => {
+  const result = expandPicker({ ...name, kinds: ['Other'] }, cols)
+  expect(result.kind === 'Single_Choice' && result.values.map((v) => v.label)).toEqual(['D "E"'])
+})
+
 test('reference wraps values as ..Name, extras first unless columns_first', () => {
   const extra = [opt('<Text Value>', "''")]
   const ref = expandPicker(
