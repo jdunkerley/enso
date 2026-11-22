@@ -261,6 +261,15 @@ export interface FunctionCall {
   parameters: Map<string, WidgetConfiguration | null>
   /** Why the engine has no widget for these arguments (`Widget_Query.resolve_call`'s errors). */
   errors?: Map<string, WidgetQueryError> | undefined
+  /** The arguments whose widget a resolver computes, with what it reads; absent when none. */
+  resolvers?: Map<string, ResolverInfo> | undefined
+  /** Why an argument shows its fallback rather than its widget; absent when none. */
+  notes?: Map<string, WidgetQueryNote> | undefined
+  /**
+   * Called with the text typed in a searchable argument's dropdown (`''` when it closes), when
+   * some argument is searchable: the engine is asked again with that text.
+   */
+  onSearch?: ((argument: string, text: string) => void) | undefined
 }
 
 /**
@@ -402,25 +411,58 @@ export const widgetQueryErrorSchema = z.object({
 })
 export type WidgetQueryError = z.infer<typeof widgetQueryErrorSchema>
 
+/**
+ * A widget computed per call by a resolver: the call's parts it reads (`'self'`, first, for the
+ * call's subject; otherwise names of the method's arguments) and whether it takes the text typed
+ * in the argument's dropdown (`search`).
+ */
+export const resolverInfoSchema = z.object({
+  dependencies: z.array(z.string()),
+  searchable: z.boolean(),
+})
+export type ResolverInfo = z.infer<typeof resolverInfoSchema>
+
+/** A resolver not run because one of its dependencies is an error. */
+const unavailableSchema = z.object({ dependency: z.string(), message: z.string() })
+
+/**
+ * Why an argument shows its fallback (the type default, or no widget) rather than its widget:
+ * a dependency of its resolver is an error, or the resolver has not answered in
+ * `RESOLVER_TIME_BOX_MS`.
+ */
+export type WidgetQueryNote =
+  { kind: 'unavailable'; dependency: string; message: string } | { kind: 'loading' }
+
 const argumentResultSchema = z.union([
-  z.object({ widget: widgetConfigurationSchema.nullable() }),
-  z.object({ error: widgetQueryErrorSchema }),
+  z.object({
+    widget: widgetConfigurationSchema.nullable(),
+    resolver: resolverInfoSchema.optional(),
+    unavailable: unavailableSchema.optional(),
+  }),
+  z.object({ error: widgetQueryErrorSchema, resolver: resolverInfoSchema.optional() }),
 ])
 
 /**
  * The answer of `Standard.Base.Metadata.Widget_Query.resolve_call`: for each argument asked
  * for, in order, its widget (`null`: none) or why it has none. `columns` lists the columns once per
  * source, which column picker references in the widgets point at (key `''`: the call's subject).
+ *
+ * An argument whose widget a resolver computes carries `resolver` (what the resolver reads); when
+ * one of those is an error, the widget is `null` and `unavailable` names it. `search` and
+ * `revision` echo the query's own, when it sent them, so a stale answer can be told apart.
  */
 export const widgetQueryAnswerSchema = z.object({
   arguments: z.array(z.tuple([argNameSchema, argumentResultSchema])),
   columns: z.record(z.string(), widgetColumnsSchema).optional(),
+  search: z.string().optional(),
+  revision: z.string().optional(),
 })
 export type WidgetQueryAnswer = z.infer<typeof widgetQueryAnswerSchema>
 
 /**
- * {@link functionCallConfiguration} of an answer: its widgets as parameters, its errors apart.
- * Column picker references are expanded from the answer's columns (through `cache`, if given).
+ * {@link functionCallConfiguration} of an answer: its widgets as parameters, its errors, its
+ * resolvers and its notes apart (each only when there is one). An argument with a note has no
+ * widget, so the call tree falls back to its type default. Column picker references are expanded from the answer's columns (through `cache`, if given).
  */
 export function functionCallFromAnswer(
   answer: WidgetQueryAnswer,
@@ -429,16 +471,24 @@ export function functionCallFromAnswer(
 ): FunctionCall {
   const parameters: ArgumentWidgetConfiguration[] = []
   const errors = new Map<string, WidgetQueryError>()
+  const resolvers = new Map<string, ResolverInfo>()
+  const notes = new Map<string, WidgetQueryNote>()
   for (const [name, result] of answer.arguments) {
+    if (result.resolver) resolvers.set(name, result.resolver)
     if ('error' in result) errors.set(name, result.error)
-    else
+    else {
+      if (result.unavailable) notes.set(name, { kind: 'unavailable', ...result.unavailable })
       parameters.push([
         name,
         result.widget && expandColumnPickers(result.widget, answer.columns, cache),
       ])
+    }
   }
-  const call = functionCallConfiguration(parameters, inherited)
-  return errors.size > 0 ? { ...call, errors } : call
+  const call: FunctionCall = functionCallConfiguration(parameters, inherited)
+  if (errors.size > 0) call.errors = errors
+  if (resolvers.size > 0) call.resolvers = resolvers
+  if (notes.size > 0) call.notes = notes
+  return call
 }
 
 /**
