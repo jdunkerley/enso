@@ -9,9 +9,12 @@ import project.Function.Function
 import project.Meta
 import project.Metadata.Widget
 import project.Metadata.Widget_Columns.Widget_Columns
+import project.Metadata.Widget_Resolver
+import project.Metadata.Widget_Resolver.Resolver_Signature
 import project.Panic.Caught_Panic
 import project.Panic.Panic
 import project.Runtime
+import project.System
 import project.Warning.Warning
 from project.Data.Boolean import Boolean, False, True
 from project.Data.Range.Extensions import all
@@ -47,45 +50,82 @@ polyglot java import org.slf4j.LoggerFactory
       method).
     - `method_name`: The method's or constructor's name.
     - `argument_names`: The arguments to resolve.
-    - `uuids`: JSON mapping argument names to expression ids, read by
-      annotations that take `cache`.
+    - `uuids`: JSON mapping argument names to expression ids: the values of
+      the arguments that resolvers depend on.
     - `subject_is_type`: Whether the subject an annotation sees is the type
       named by `type_name` rather than `value` (a call with no subject
       expression, such as an autoscoped constructor).
+    - `search`: The text typed in the argument, passed to every resolver that
+      declares `search` (`""`: the full list).
+    - `type_defaults`: JSON mapping argument names to type names: an argument
+      with no annotation is resolved through that type's default widget,
+      which may be a resolver.
+    - `revision`: Not used by the resolution: the IDE changes it to have the
+      query evaluated again when a dependency's value changed but its
+      expression did not.
 
    An error as `value` (with `subject_is_type` False) is the user's own error,
    not a widget failure: the answer is `{"widget":null}` for every argument,
    nothing is logged and no annotation is evaluated.
 
+   An annotation (or a type default) that is a function, or a
+   `Widget.Resolver`, is a resolver: its first parameter receives the subject,
+   and every other parameter names an argument of the call (defaulted to
+   `Nothing`) or is `search : Text = ""` (see `Widget_Resolver`). Each
+   dependency's value is looked up through `uuids`; when one is an error the
+   resolver is not run and the argument is unavailable. A resolver that runs
+   for over ten seconds is logged at Warning.
+
    ## Returns
-   `{"arguments":[[<name>,{"widget":<widget or null>}|{"error":{"step":…,"message":…}}],…]}`
-   and, when a resolved widget has a column picker, a `"columns"` block beside
-   `"arguments"`: `,"columns":{<source>:<Widget_Columns>,…}`, one entry for each
-   distinct source the pickers name (`""`: the subject; otherwise the name of
-   another argument), sent once however many pickers use it. A source that is
-   not set, is an error, or has no `Widget_Columns` conversion is absent (a
-   conversion that panics is logged and also absent). It is read by the GUI (its
-   schema is `widgetQueryAnswerSchema` in
+   `{"arguments":[[<name>,<result>],…]}`, where a result is:
+   - `{"widget":<widget or null>}`: a static widget;
+   - `{"widget":…,"resolver":{"dependencies":[…],"searchable":…}}`: a
+     resolver's widget, or column pickers (what the widget depends on, the
+     subject as `"self"`);
+   - `{"widget":null,"resolver":{…},"unavailable":{"dependency":…,"message":…}}`:
+     a dependency's value is an error;
+   - `{"error":{"step":…,"message":…}}`, followed by `,"resolver":{…}` when a
+     resolver's run failed.
+
+   When a resolved widget has a column picker, a `"columns"` block follows
+   `"arguments"`: `,"columns":{<source>:<Widget_Columns>,…}`, one entry for
+   each distinct source the pickers name (`""`: the subject; otherwise the name
+   of another argument), sent once however many pickers use it. A source that
+   is not set, is an error, or has no `Widget_Columns` conversion is absent (a
+   conversion that panics is logged and also absent). Then `,"search":…` and
+   `,"revision":…`, each only when not empty, so the IDE can drop the answer to
+   an older query. It is read by the GUI (its schema is
+   `widgetQueryAnswerSchema` in
    `app/gui/src/providers/openedProjects/widgetRegistry/configuration.ts`).
-resolve_call (value : Any) (module_name : Text) (type_name : Text) (method_name : Text) (argument_names : Vector Text) (uuids : Text = "{}") (subject_is_type : Boolean = False) -> Text =
+resolve_call (value : Any) (module_name : Text) (type_name : Text) (method_name : Text) (argument_names : Vector Text) (uuids : Text = "{}") (subject_is_type : Boolean = False) (search : Text = "") (type_defaults : Text = "{}") (revision : Text = "") -> Text =
     method = Widget_Method.Value module_name type_name method_name
+    echo = (if search.is_empty then "" else ',"search":' + search.to_json) + (if revision.is_empty then "" else ',"revision":' + revision.to_json)
     Progress.run label=method.qualified_name up_to=1 handle_name="Widget_Query."+method.qualified_name action=_->
-        if value.is_error && subject_is_type.not then _no_widgets argument_names else
+        if value.is_error && subject_is_type.not then _no_widgets argument_names echo else
             subject = if subject_is_type then Meta.find_type_or_module type_name else Warning.clear value
-            cache = _cache_from uuids
-            inputs = _inputs_key subject uuids
-            results = argument_names.map argument-> resolve_argument method argument subject cache
+            value_of = _values_from uuids
+            inputs = _inputs_key subject uuids search
+            call_arguments = Meta.get_method_argument_names module_name type_name method_name . catch Any (_-> [])
+            defaults = if type_defaults == "{}" then Nothing else type_defaults.parse_json
+            results = argument_names.map argument->
+                type_default = if defaults.is_nothing then Nothing else case defaults.get argument of
+                    name : Text -> name
+                    _ -> Nothing
+                resolve_argument method argument subject value_of search call_arguments type_default
             entries = argument_names.zip results argument-> result->
                 _ = case result of
-                    Argument_Result.Failed failure -> log_failure failure inputs
+                    Argument_Result.Failed failure _ -> log_failure failure inputs
+                    Argument_Result.Dynamic _ _ _ unavailable -> if unavailable.is_empty then False else
+                        _log_unavailable method argument unavailable inputs
                     _ -> False
                 '[' + argument.to_json + ',' + result.to_json + ']'
             sources = Vector.build builder->
                 results.each result-> case result of
                     Argument_Result.Resolved widget _ -> if widget.is_nothing.not then widget.collect_column_sources builder
+                    Argument_Result.Dynamic widget _ _ _ -> if widget.is_nothing.not then widget.collect_column_sources builder
                     _ -> Nothing
-            columns = columns_json sources subject cache method inputs
-            '{"arguments":[' + (entries.join ",") + ']' + columns + '}'
+            columns = columns_json sources subject value_of method inputs
+            '{"arguments":[' + (entries.join ",") + ']' + columns + echo + '}'
 
 ## ---
    private: true
@@ -96,13 +136,13 @@ resolve_call (value : Any) (module_name : Text) (type_name : Text) (method_name 
     - `sources`: The column sources: `Nothing` for the subject, else the name
       of an argument.
     - `subject`: The call's subject.
-    - `cache`: Looks an argument's value up by name.
+    - `value_of`: Looks an argument's value up by name.
     - `method`: The method, for the log.
     - `inputs`: What the result depends on, for the log.
-columns_json (sources : Vector) subject (cache : Function) (method : Widget_Method = Widget_Method.Value "" "" "") (inputs : Text = "") -> Text =
+columns_json (sources : Vector) subject (value_of : Function) (method : Widget_Method = Widget_Method.Value "" "" "") (inputs : Text = "") -> Text =
     entries = Vector.build builder->
         sources.each source->
-            value = if source.is_nothing then subject else cache source
+            value = if source.is_nothing then subject else value_of source
             columns = if value.is_error || value.is_nothing then Nothing else
                 handler caught = case caught.payload of
                     _ : No_Such_Conversion -> Nothing
@@ -129,7 +169,9 @@ columns_json (sources : Vector) subject (cache : Function) (method : Widget_Meth
     - `type_name`: The type's qualified name.
 
    ## Returns
-   `{"widget":<widget or null>}` (`null`: the type has no default) or
+   `{"widget":<widget or null>}` (`null`: the type has no default),
+   `{"widget":null,"resolver":{"dependencies":[…],"searchable":…}}` (the
+   default is a resolver, which `resolve_call` runs for each call) or
    `{"error":{"step":"lookup"|"type_default","message":…}}`. Failures are
    logged once, as `resolve_call`'s are.
 resolve_type (type_name : Text) -> Text =
@@ -138,7 +180,7 @@ resolve_type (type_name : Text) -> Text =
         ## `module_name` of the method is the type's name: the conversion is looked up on the type.
         result = resolve_type_argument method type_name
         _ = case result of
-            Argument_Result.Failed failure -> log_failure failure "type"
+            Argument_Result.Failed failure _ -> log_failure failure "type"
             _ -> False
         result.to_json
 
@@ -147,38 +189,147 @@ resolve_type (type_name : Text) -> Text =
    ---
    `resolve_type`'s result before it is logged (exposed for the tests).
 resolve_type_argument (method : Widget_Method) (type_name : Text) -> Argument_Result =
+    default = _type_default method "" type_name
+    case default of
+        Widget.Resolver f -> Argument_Result.Dynamic Nothing "null" (Widget_Resolver.signature_of f) ""
+        _ -> default
+
+## The default widget of the type `type_name`: a `Widget.Resolver` (not run),
+   or else the `Argument_Result`.
+private _type_default (method : Widget_Method) (argument : Text) (type_name : Text) =
     typ = Meta.find_type_or_module type_name
-    if typ.is_error then Argument_Result.Failed (_failure_from_error method "" "lookup" typ) else
+    if typ.is_error then Argument_Result.Failed (_failure_from_error method argument "lookup" typ) Nothing else
         handler caught = case _is_missing_default caught.payload typ of
             True -> Argument_Result.Resolved Nothing "null"
-            False -> Argument_Result.Failed (_failure_from_panic method "" caught step="type_default")
+            False -> Argument_Result.Failed (_failure_from_panic method argument caught step="type_default") Nothing
         Panic.catch Any handler=handler <|
             widget = Widget.from typ
             if widget.is_error && (_is_missing_default widget.catch typ) then Argument_Result.Resolved Nothing "null" else
-                _as_result method "" widget step="type_default"
+                if widget.is_error then _as_result method argument widget step="type_default" else
+                    case widget of
+                        Widget.Resolver _ -> widget
+                        _ -> _as_result method argument widget step="type_default"
 
 ## ---
    private: true
    ---
-   The widget of one argument, or why there is none. An annotation is a
-   `Widget`, or a function of the subject, which may also take `cache`.
+   The widget of one argument, or why there is none: the annotation's (a
+   `Widget`, or a resolver), else the default widget of the type named in
+   `type_default`.
 
    ## Arguments
     - `method`: The method.
     - `argument`: The argument's name.
-    - `subject`: What a function annotation is applied to.
-    - `cache`: Looks an argument's value up by name or index (`uuids`).
-resolve_argument (method : Widget_Method) (argument : Text) subject (cache : Function) -> Argument_Result =
-    Panic.catch Any handler=(caught-> Argument_Result.Failed (_failure_from_panic method argument caught)) <|
+    - `subject`: The call's subject, a resolver's first parameter.
+    - `value_of`: An argument's value by name (`Nothing` when not set).
+    - `search`: The text typed in the argument.
+    - `call_arguments`: The method's argument names, which a resolver's
+      parameters are checked against (`Nothing`: not checked).
+    - `type_default`: The qualified name of the type whose default widget an
+      argument with no annotation gets, or `Nothing`.
+resolve_argument (method : Widget_Method) (argument : Text) subject (value_of : Function) (search : Text = "") (call_arguments : Vector | Nothing = Nothing) (type_default : Text | Nothing = Nothing) -> Argument_Result =
+    Panic.catch Any handler=(caught-> Argument_Result.Failed (_failure_from_panic method argument caught) Nothing) <|
         annotation = Meta.get_method_annotation method.module_name method.type_name method.method_name argument
-        if annotation.is_error && (_is_lookup_error annotation.catch) then Argument_Result.Failed (_failure_from_error method argument "lookup" annotation) else
-            widget = case annotation of
+        if annotation.is_error then (if _is_lookup_error annotation.catch then Argument_Result.Failed (_failure_from_error method argument "lookup" annotation) Nothing else _as_result method argument annotation) else
+            case annotation of
+                Nothing -> if type_default.is_nothing then Argument_Result.Resolved Nothing "null" else
+                    default = _type_default method argument type_default
+                    case default of
+                        Widget.Resolver f -> run_resolver method argument f subject value_of search Nothing
+                        _ -> default
+                Widget.Resolver f -> run_resolver method argument f subject value_of search call_arguments
                 f : Function ->
+                    ## The legacy form, until every library's helpers are resolvers.
                     with_cache = Meta.meta f . arguments pending=True defaulted=True . contains "cache"
-                    applied = if with_cache then f cache=cache else f
-                    applied subject
-                _ -> annotation
-            _as_result method argument widget
+                    if with_cache then _as_result method argument (f cache=value_of subject) else
+                        run_resolver method argument f subject value_of search call_arguments
+                _ -> _static_result method argument annotation
+
+## ---
+   private: true
+   ---
+   Runs a resolver with its declared dependencies, after checking its
+   parameters (`Widget_Resolver.check`). A dependency whose value is an error
+   makes the argument unavailable, without running the resolver. A run over
+   `slow_ms` milliseconds is logged at Warning.
+
+   ## Arguments
+    - `method`: The method.
+    - `argument`: The argument's name.
+    - `resolver`: The resolver.
+    - `subject`: The call's subject.
+    - `value_of`: An argument's value by name.
+    - `search`: The text typed in the argument.
+    - `call_arguments`: The method's argument names (`Nothing`: not checked).
+    - `slow_ms`: The run time over which the run is logged.
+run_resolver (method : Widget_Method) (argument : Text) (resolver : Function) subject (value_of : Function) (search : Text) (call_arguments : Vector | Nothing) (slow_ms : Integer = 10000) -> Argument_Result =
+    signature = Widget_Resolver.signature_of resolver
+    problem = Widget_Resolver.check signature call_arguments method.qualified_name
+    if problem.is_nothing.not then Argument_Result.Failed (Widget_Failure.Value method argument "resolver" problem [] []) Nothing else
+        broken = signature.dependencies.find (name-> value_of name . is_error) if_missing=Nothing
+        if broken.is_nothing.not then Argument_Result.Dynamic Nothing "null" signature (_unavailable_json broken (value_of broken)) else
+            handler caught = Argument_Result.Failed (_failure_from_panic method argument caught step="resolver") signature
+            Panic.catch Any handler=handler <|
+                start = System.nano_time
+                widget = Widget_Resolver.apply resolver signature subject value_of search
+                elapsed_ms = (System.nano_time - start).div 1000000
+                _ = if elapsed_ms > slow_ms then _log_slow method argument elapsed_ms
+                _dynamic_result method argument widget signature
+
+## ---
+   private: true
+   ---
+   The log text of a resolver run that took `elapsed_ms`.
+slow_message (method : Widget_Method) (argument : Text) (elapsed_ms : Integer) -> Text =
+    seconds = elapsed_ms.div 1000
+    "The resolver of `" + argument + "` of " + method.qualified_name + " (defined in " + method.module_name + ") took " + seconds.to_text + " s."
+
+private _log_slow (method : Widget_Method) (argument : Text) (elapsed_ms : Integer) -> Nothing =
+    builder = LoggerFactory.getLogger "Standard.Base.Metadata.Widget_Query" . atWarn
+    builder.setMessage (slow_message method argument elapsed_ms)
+    builder.log
+    Nothing
+
+## Logs an unavailable dependency at Info, once per method, argument, inputs
+   and message.
+private _log_unavailable (method : Widget_Method) (argument : Text) (unavailable : Text) (inputs : Text) -> Boolean =
+    key = "unavailable|" + method.module_name + "|" + method.qualified_name + "|" + argument + "|" + inputs + "|" + unavailable
+    first = LogOnce.firstTime key
+    if first then
+        builder = LoggerFactory.getLogger "Standard.Base.Metadata.Widget_Query" . atInfo
+        builder.setMessage ("The widget of `" + argument + "` of " + method.qualified_name + " is unavailable: " + unavailable)
+        builder.log
+    first
+
+private _unavailable_json (dependency : Text) error -> Text =
+    ',"unavailable":{"dependency":' + dependency.to_json + ',"message":' + (_describe error.catch).to_json + '}'
+
+## A static annotation's result; column pickers announce their sources as
+   their dependencies.
+private _static_result (method : Widget_Method) (argument : Text) annotation -> Argument_Result =
+    result = _as_result method argument annotation
+    case result of
+        Argument_Result.Resolved widget json -> if widget.is_nothing then result else
+            sources = widget.column_sources
+            if sources.is_empty then result else
+                Argument_Result.Dynamic widget json (_picker_signature sources) ""
+        _ -> result
+
+## The signature of column pickers reading `sources`.
+private _picker_signature (sources : Vector) -> Resolver_Signature =
+    has_subject = sources.any .is_nothing
+    names = sources.filter source-> source.is_nothing.not
+    Resolver_Signature.Value (if has_subject then "self" else Nothing) names False []
+
+private _dynamic_result (method : Widget_Method) (argument : Text) widget (signature : Resolver_Signature) -> Argument_Result =
+    if widget.is_nothing then Argument_Result.Dynamic Nothing "null" signature "" else
+        result = if widget.is_error then _as_result method argument widget step="resolver" else case widget of
+            Widget.Resolver _ -> Argument_Result.Failed (Widget_Failure.Value method argument "resolver" "A resolver gave another Widget.Resolver." [] []) Nothing
+            _ -> _as_result method argument widget step="resolver"
+        case result of
+            Argument_Result.Resolved w json -> Argument_Result.Dynamic w json signature ""
+            Argument_Result.Failed failure _ -> Argument_Result.Failed failure signature
+            _ -> result
 
 ## ---
    private: true
@@ -235,9 +386,11 @@ type Widget_Method
     - `method`: The method.
     - `argument`: The argument's name.
     - `step`: `"lookup"` (no such method, module or type), `"annotation"`
-      (evaluating the annotation failed, or did not give a `Widget`) or
-      `"type_default"` (the same, for a type's default widget) or `"columns"`
-      (converting a column source to `Widget_Columns` panicked).
+      (evaluating the annotation failed, or did not give a `Widget`),
+      `"type_default"` (the same, for a type's default widget), `"resolver"`
+      (a resolver's parameters break the rule, or running it failed or did
+      not give a `Widget`) or `"columns"` (converting a column source to
+      `Widget_Columns` panicked).
     - `message`: What went wrong.
     - `causes`: The error's causes, outermost first.
     - `stack`: For a panic, its Enso stack trace.
@@ -279,28 +432,47 @@ type Argument_Result
     ## ---
        private: true
        ---
-       The widget could not be resolved.
-    Failed failure:Widget_Failure
+       A widget that depends on the call: a resolver's, or column pickers'.
+
+       ## Arguments
+        - `widget`: The widget (`Nothing`: none, or unavailable).
+        - `json`: Its JSON.
+        - `signature`: What it depends on.
+        - `unavailable`: `""`, or the `,"unavailable":{…}` text when a
+          dependency is an error.
+    Dynamic widget:(Widget | Nothing) json:Text signature:Resolver_Signature unavailable:Text
 
     ## ---
        private: true
        ---
-       `{"widget":…}` or `{"error":…}`.
+       The widget could not be resolved.
+
+       ## Arguments
+        - `failure`: Why.
+        - `signature`: The resolver's signature, when it was read.
+    Failed failure:Widget_Failure signature:(Resolver_Signature | Nothing)
+
+    ## ---
+       private: true
+       ---
+       `{"widget":…}`, `{"widget":…,"resolver":…}` or `{"error":…}`.
     to_json self -> Text = case self of
         Argument_Result.Resolved _ json -> '{"widget":' + json + '}'
-        Argument_Result.Failed failure -> '{"error":' + failure.to_json + '}'
+        Argument_Result.Dynamic _ json signature unavailable -> '{"widget":' + json + ',"resolver":' + signature.to_json + unavailable + '}'
+        Argument_Result.Failed failure signature ->
+            '{"error":' + failure.to_json + (if signature.is_nothing then "" else ',"resolver":' + signature.to_json) + '}'
 
 private _as_result (method : Widget_Method) (argument : Text) widget (step : Text = "annotation") -> Argument_Result =
-    if widget.is_error then Argument_Result.Failed (_failure_from_error method argument step widget) else
+    if widget.is_error then Argument_Result.Failed (_failure_from_error method argument step widget) Nothing else
         case widget of
             Nothing -> Argument_Result.Resolved Nothing "null"
             _ : Widget ->
                 json = widget.to_json
-                if json.is_error then Argument_Result.Failed (_failure_from_error method argument step json) else
+                if json.is_error then Argument_Result.Failed (_failure_from_error method argument step json) Nothing else
                     Argument_Result.Resolved widget json
             _ ->
-                message = "The annotation gave " + (Meta.type_of widget . to_text) + ", not a Widget."
-                Argument_Result.Failed (Widget_Failure.Value method argument step message [] [])
+                message = "The " + (if step == "resolver" then "resolver" else "annotation") + " gave " + (Meta.type_of widget . to_text) + ", not a Widget."
+                Argument_Result.Failed (Widget_Failure.Value method argument step message [] []) Nothing
 
 ## Whether `payload` is the top-level miss: no `Widget.from` for `typ` itself. A
    `No_Such_Conversion` raised inside the type's own conversion is not.
@@ -342,18 +514,30 @@ private _cause_of value = case value of
             if index.is_nothing then Nothing else atom.fields.at index
         _ -> Nothing
 
-private _cache_from (uuids : Text) -> Function =
+## Looks an argument's value up by name: the value of its expression id in
+   `uuids`, or `Nothing` when it has none.
+private _values_from (uuids : Text) -> Function =
     other_args = uuids.parse_json
-    cache (name_or_index : Text | Integer) =
+    value_of (name_or_index : Text | Integer) =
         case other_args.get name_or_index.to_text of
             uuid : Text -> Runtime.value_for_uuid uuid
             _ -> Nothing
-    cache
+    value_of
 
-private _inputs_key subject (uuids : Text) -> Text =
+## ---
+   private: true
+   ---
+   An argument lookup for the tests, in place of the one `resolve_call`
+   builds from `uuids`.
+
+   ## Arguments
+    - `lookup`: An argument's value by name.
+values_from_lookup (lookup : Function) -> Function = lookup
+
+private _inputs_key subject (uuids : Text) (search : Text) -> Text =
     subject_type = (Meta.type_of subject . to_text) . catch Any (_-> "<error>")
-    subject_type + "|" + uuids
+    subject_type + "|" + uuids + "|" + search
 
-private _no_widgets (argument_names : Vector Text) -> Text =
+private _no_widgets (argument_names : Vector Text) (echo : Text) -> Text =
     entries = argument_names.map argument-> '[' + argument.to_json + ',{"widget":null}]'
-    '{"arguments":[' + (entries.join ",") + ']}'
+    '{"arguments":[' + (entries.join ",") + ']' + echo + '}'

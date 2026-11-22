@@ -53,6 +53,21 @@ type Sample
 
     plain self (arg = 0) = arg
 
+    @arg _choice_of_other
+    of_other self (arg = 0) (other = 0) = arg + other
+
+    @arg _choice_of_search
+    searching self (arg = 0) = arg
+
+    @arg _misspelt
+    misspelt self (arg = 0) (other = 0) = arg + other
+
+    @arg (Widget.Resolver _choice_of_other)
+    wrapped self (arg = 0) (other = 0) = arg + other
+
+    @arg _not_a_widget
+    resolver_not_a_widget self (arg = 0) = arg
+
     @first (Widget.Boolean_Input)
     @second (Error.throw (Illegal_Argument.Error "second fails"))
     two self (first = 0) (second = 0) = first + second
@@ -120,6 +135,32 @@ private _choice_of_label subject -> Widget =
 private _choice_of_cache _ cache=Nothing -> Widget =
     Widget.Single_Choice [Choice.Option (cache "other" . to_text)]
 
+private _choice_of_other subject (other = Nothing) -> Widget =
+    _ = subject
+    Widget.Single_Choice [Choice.Option other.to_text]
+
+private _choice_of_search subject (search : Text = "") -> Widget =
+    _ = subject
+    Widget.Single_Choice [Choice.Option ("found " + search)]
+
+private _misspelt subject (othr = Nothing) -> Widget =
+    _ = [subject, othr]
+    Widget.Text_Input
+
+private _not_a_widget subject = subject
+
+## A type whose default widget needs the subject and another argument.
+type Needs_Subject
+    Value
+
+private _needs_subject_widget table (right = Nothing) -> Widget =
+    _ = [table, right]
+    Widget.Text_Input
+
+Widget.from (that : Needs_Subject.type) -> Widget =
+    _ = that
+    Widget.Resolver _needs_subject_widget
+
 private _panics subject = Panic.throw (Illegal_State.Error "boom for "+subject.label)
 
 ## The answer for one argument whose widget is `widget`.
@@ -182,8 +223,9 @@ add_specs suite_builder =
     suite_builder.group "Widget_Query.resolve_call evaluates annotations as before" group_builder->
         sample = Sample.Value "a label"
 
-        group_builder.specify "a function of self" <|
-            Widget_Query.resolve_call sample spec_module sample_type "of_self" ["arg"] . should_equal (answer "arg" (Widget.Single_Choice [Choice.Option "a label"]))
+        group_builder.specify "a function of self, announced as a resolver of the subject" <|
+            expected = '{"arguments":[["arg",{"widget":' + (Widget.Single_Choice [Choice.Option "a label"]).to_json + ',"resolver":{"dependencies":["self"],"searchable":false}}]]}'
+            Widget_Query.resolve_call sample spec_module sample_type "of_self" ["arg"] . should_equal expected
 
         group_builder.specify "a function of self taking cache, which reads the uuids" <|
             Widget_Query.resolve_call sample spec_module sample_type "of_cache" ["arg"] "{}" . should_equal (answer "arg" (Widget.Single_Choice [Choice.Option "Nothing"]))
@@ -198,6 +240,89 @@ add_specs suite_builder =
             arguments.first.second.get "error" . get "message" . should_contain "second fails"
             arguments.second.second.get "widget" . get "constructor" . should_equal "Boolean_Input"
 
+    suite_builder.group "Widget_Query.resolve_call runs resolvers" group_builder->
+        sample = Sample.Value "a label"
+        method name = Widget_Method.Value spec_module sample_type name
+        resolver_json deps searchable = ',"resolver":{"dependencies":' + deps.to_json + ',"searchable":' + searchable.to_json + '}'
+
+        group_builder.specify "a dependency's value reaches the resolver, and is announced" <|
+            values = Widget_Query.values_from_lookup (name-> if name == "other" then 42 else Nothing)
+            result = Widget_Query.resolve_argument (method "of_other") "arg" sample values "" ["arg", "other"] Nothing
+            result.to_json . should_equal '{"widget":' + (Widget.Single_Choice [Choice.Option "42"]).to_json + (resolver_json ["self", "other"] False) + '}'
+
+        group_builder.specify "an unset dependency is Nothing" <|
+            json = Widget_Query.resolve_call sample spec_module sample_type "of_other" ["arg"] . parse_json
+            json.get "arguments" . first . second . get "widget" . get "values" . first . get "label" . should_equal "Nothing"
+
+        group_builder.specify "a Widget.Resolver annotation runs the same way" <|
+            values = Widget_Query.values_from_lookup (name-> if name == "other" then 7 else Nothing)
+            result = Widget_Query.resolve_argument (method "wrapped") "arg" sample values "" ["arg", "other"] Nothing
+            result.to_json . should_contain '"label":"7"'
+            result.to_json . should_contain (resolver_json ["self", "other"] False)
+
+        group_builder.specify "search reaches a searchable resolver" <|
+            json = Widget_Query.resolve_call sample spec_module sample_type "searching" ["arg"] "{}" False "abc" . parse_json
+            result = json.get "arguments" . first . second
+            result.get "widget" . get "values" . first . get "label" . should_equal "found abc"
+            result.get "resolver" . get "searchable" . should_be_true
+            result.get "resolver" . get "dependencies" . should_equal ["self"]
+
+        group_builder.specify "a dependency that is an error skips the resolver" <|
+            values = Widget_Query.values_from_lookup (_-> Error.throw (Illegal_Argument.Error "bad right"))
+            result = Widget_Query.resolve_argument (method "of_other") "arg" sample values "" ["arg", "other"] Nothing
+            json = result.to_json . parse_json
+            json.get "widget" . should_equal Nothing
+            json.get "unavailable" . get "dependency" . should_equal "other"
+            json.get "unavailable" . get "message" . should_contain "bad right"
+            json.get "resolver" . get "dependencies" . should_equal ["self", "other"]
+
+        group_builder.specify "a parameter that is no argument is the widget's error" <|
+            json = Widget_Query.resolve_call sample spec_module sample_type "misspelt" ["arg"] . parse_json
+            error = json.get "arguments" . first . second . get "error"
+            error.get "step" . should_equal "resolver"
+            error.get "message" . should_contain "`othr`"
+
+        group_builder.specify "a resolver that gives no Widget fails at the resolver step, with its signature" <|
+            json = Widget_Query.resolve_call sample spec_module sample_type "resolver_not_a_widget" ["arg"] . parse_json
+            result = json.get "arguments" . first . second
+            result.get "error" . get "step" . should_equal "resolver"
+            result.get "resolver" . get "dependencies" . should_equal ["self"]
+
+        group_builder.specify "column pickers announce their sources" <|
+            json = Widget_Query.resolve_call (Fake_Table.Value ["A"]) spec_module (spec_module + ".Fake_Table") "pick" ["column", "other"] . parse_json
+            json.get "arguments" . first . second . get "resolver" . get "dependencies" . should_equal ["self"]
+            json.get "arguments" . second . second . get "resolver" . get "dependencies" . should_equal ["other"]
+
+        group_builder.specify "search and revision are echoed, only when set" <|
+            json = Widget_Query.resolve_call sample spec_module sample_type "searching" ["arg"] "{}" False "abc" "{}" "7" . parse_json
+            json.get "search" . should_equal "abc"
+            json.get "revision" . should_equal "7"
+            Widget_Query.resolve_call sample spec_module sample_type "probe" ["arg"] . should_not_contain '"revision"'
+            Widget_Query.resolve_call sample spec_module sample_type "probe" ["arg"] . should_not_contain '"search"'
+
+        group_builder.specify "an error subject echoes too" <|
+            json = Widget_Query.resolve_call (Error.throw "e") spec_module sample_type "probe" ["arg"] "{}" False "" "{}" "3"
+            json . should_equal '{"arguments":[["arg",{"widget":null}]],"revision":"3"}'
+
+        group_builder.specify "a static widget has no resolver field" <|
+            Widget_Query.resolve_call sample spec_module sample_type "probe" ["arg"] . should_equal '{"arguments":[["arg",{"widget":{"constructor":"Boolean_Input"}}]]}'
+
+        group_builder.specify "type_defaults resolves an unannotated argument through its type's resolver" <|
+            json = Widget_Query.resolve_call sample spec_module sample_type "plain" ["arg"] "{}" False "" ('{"arg":"' + spec_module + '.Needs_Subject"}') . parse_json
+            result = json.get "arguments" . first . second
+            result.get "resolver" . get "dependencies" . should_equal ["self", "right"]
+            result.get "widget" . get "constructor" . should_equal "Text_Input"
+
+        group_builder.specify "type_defaults gives a static default as resolve_type would" <|
+            json = Widget_Query.resolve_call sample spec_module sample_type "plain" ["arg"] "{}" False "" ('{"arg":"' + spec_module + '.Has_Default"}')
+            json . should_equal (answer "arg" (Widget.from Has_Default))
+
+        group_builder.specify "a run over the threshold is logged, and still answers" <|
+            values = Widget_Query.values_from_lookup (_-> Nothing)
+            result = Widget_Query.run_resolver (method "of_other") "arg" _choice_of_other sample values "" ["arg", "other"] slow_ms=-1
+            result.to_json . should_contain '"Single_Choice"'
+            Widget_Query.slow_message (method "of_other") "arg" 12500 . should_contain "took 12 s."
+
     suite_builder.group "Widget_Query.resolve_call gives errors as results" group_builder->
         sample = Sample.Value "a label"
 
@@ -206,9 +331,9 @@ add_specs suite_builder =
             error.get "step" . should_equal "annotation"
             error.get "message" . should_contain "no choices"
 
-        group_builder.specify "an annotation that panics" <|
+        group_builder.specify "a resolver that panics" <|
             error = error_of (Widget_Query.resolve_call sample spec_module sample_type "fails_with_panic" ["arg"])
-            error.get "step" . should_equal "annotation"
+            error.get "step" . should_equal "resolver"
             error.get "message" . should_contain "boom for a label"
 
         group_builder.specify "an annotation that is not a Widget" <|
@@ -273,6 +398,8 @@ add_specs suite_builder =
         group_builder.specify "answers a lookup error for an unknown type" <|
             json = Widget_Query.resolve_type spec_module+".Nope" . parse_json
             json.get "error" . get "step" . should_equal "lookup"
+        group_builder.specify "a resolver default is announced, not run" <|
+            Widget_Query.resolve_type (spec_module + ".Needs_Subject") . should_equal '{"widget":null,"resolver":{"dependencies":["self","right"],"searchable":false}}'
         group_builder.specify "answers a type_default error when the conversion fails" <|
             json = Widget_Query.resolve_type spec_module+".Broken_Default" . parse_json
             json.get "error" . get "step" . should_equal "type_default"
