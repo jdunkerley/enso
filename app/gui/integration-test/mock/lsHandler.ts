@@ -1074,6 +1074,43 @@ function isMethodBodyId(id: string | undefined): boolean {
   return false
 }
 
+/**
+ * Whether `id` is an expression strictly inside a node's binding expression (`x = <here>`). The
+ * engine caches the values of binding expressions and self arguments only (`CachePreferenceAnalysis`),
+ * so a visualization attached to any other expression is answered only when that expression is
+ * computed again, which the mock never does.
+ */
+function isInsideNodeExpression(id: string | undefined): boolean {
+  if (id == null) return false
+  for (const doc of mockModuleDocs) {
+    const root = new Ast.MutableModule(doc).root()
+    if (!(root instanceof Ast.BodyBlock)) continue
+    for (const statement of root.statements()) {
+      if (!(statement instanceof Ast.FunctionDef) || !(statement.body instanceof Ast.BodyBlock))
+        continue
+      for (const line of statement.body.statements()) {
+        if (!(line instanceof Ast.Assignment)) continue
+        let inside = false
+        Ast.visitRecursive(line.expression, (ast) => {
+          if (ast.externalId === id && id !== line.expression.externalId) inside = true
+          return !inside
+        })
+        if (inside) return true
+      }
+    }
+  }
+  return false
+}
+
+/** Whether `request` is a method-pointer widget query sent with `subject_is_type` (no subject). */
+function isSubjectlessWidgetQuery(request: VisRequestPreprocessor): boolean {
+  return (
+    isWidgetQuery(request) &&
+    !(typeof request.expression === 'object' && 'inFrame' in request.expression) &&
+    slotPositionalArgs(request)[5] === 'True'
+  )
+}
+
 /** If the slot's preprocessor is mocked, write the mock bytes into it. */
 function maybeRespondToSlot(slot: YMap<unknown>): void {
   const request = slot.get(VIS_SLOT_FIELDS.request) as VisRequestPreprocessor | undefined
@@ -1088,6 +1125,14 @@ function maybeRespondToSlot(slot: YMap<unknown>): void {
     typeof request.expression === 'object' &&
     'inFrame' in request.expression &&
     !isMethodBodyId(slot.get(VIS_SLOT_FIELDS.nodeExternalId) as string | undefined)
+  ) {
+    return
+  }
+  // A query with no subject attached inside a node, where the engine keeps no value: it would be
+  // answered only when the node runs again (Note [A Query With No Subject Hangs On Its Node]).
+  if (
+    isSubjectlessWidgetQuery(request) &&
+    isInsideNodeExpression(slot.get(VIS_SLOT_FIELDS.nodeExternalId) as string | undefined)
   ) {
     return
   }

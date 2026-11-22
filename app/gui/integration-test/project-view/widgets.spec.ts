@@ -2818,7 +2818,7 @@ test.describe('Column pickers', () => {
     setupApi: {
       local: () =>
         setMockMainFile(
-          "from Standard.Base import Data\n\nmain =\n    summed = Data.aggregate_by (..Sum)\n    joined = Data.join_on\n    lone = Data.lone_column\n    filtered = Data.filter_by 'county' ..Contains\n    picked = Data.filter_by 'county'\n    conditioned = Data.join_with on=[(..Equals 'county')]\n",
+          "from Standard.Base import Data\n\nmain =\n    summed = Data.aggregate_by (..Sum)\n    joined = Data.join_on\n    lone = Data.lone_column\n    filtered = Data.filter_by 'county' ..Contains\n    picked = Data.filter_by 'county'\n    conditioned = Data.join_with on=[(..Equals 'county')]\n    formatted = Data.read_with 'c.csv'\n",
         ),
     },
   })
@@ -3186,6 +3186,93 @@ test.describe('Column pickers', () => {
     await right.click()
     const dropDown = new DropDownLocator(right)
     await dropDown.expectVisibleWithOptions(['Right X', 'Right Y'])
+  })
+
+  // The owner's #933 sequence: `format` picked as `..Delimited` in a node the engine has already
+  // computed. The constructor has no subject, so its query is sent with `subject_is_type`; the
+  // engine keeps no value for an expression inside a node, so a query attached to the
+  // constructor itself was answered only when the node ran again (the mock never runs it again).
+  test("a picked constructor's own widgets come without the node running again", async ({
+    editorPage,
+    page,
+    localApi,
+  }) => {
+    const option = (value: string) => ({
+      type: 'Choice',
+      constructor: 'Option',
+      value,
+      label: value,
+      parameters: [],
+    })
+    await editorPage.mockSuggestion(method('read_with', ['path', 'format'])).mockSuggestion({
+      type: 'constructor' as const,
+      module: 'Standard.Base.Delimited_Format',
+      name: 'Delimited',
+      arguments: [{ name: 'delimiter', reprType: ANY_TYPE, isSuspended: false, hasDefault: false }],
+      returnType: 'Standard.Base.Delimited_Format.Delimited_Format',
+      documentation: '',
+      annotations: ['delimiter'],
+    })
+    await localApi.updateVisualization('.read_with', {
+      arguments: [
+        ['path', { widget: null }],
+        [
+          'format',
+          {
+            widget: {
+              type: 'Widget',
+              constructor: 'Single_Choice',
+              values: [option('..Auto_Detect'), option('..Delimited')],
+            },
+          },
+        ],
+      ],
+    })
+    await localApi.updateVisualization('.Delimited', {
+      arguments: [
+        [
+          'delimiter',
+          {
+            widget: {
+              type: 'Widget',
+              constructor: 'Single_Choice',
+              values: [option("','"), option("';'")],
+            },
+          },
+        ],
+      ],
+    })
+    await mockMethodCallInfo(page, 'formatted', {
+      ...pointer('read_with'),
+      notAppliedArguments: [1],
+    })
+    const node = locate.graphNodeByBinding(page, 'formatted')
+    const format = conditionArg(node, 'format')
+    await expect(format).toBeVisible()
+    await format.click()
+    const formats = new DropDownLocator(format)
+    await formats.expectVisibleWithOptions(['..Auto_Detect', '..Delimited'])
+    await formats.clickOption('..Delimited')
+    await expect
+      .poll(() => moduleCode(page))
+      .toContain("formatted = Data.read_with 'c.csv' ..Delimited\n")
+    // What the engine reports once the node has run with the new code.
+    await mockMethodCallInfo(
+      page,
+      { binding: 'formatted', expr: '..Delimited' },
+      {
+        methodPointer: {
+          module: 'Standard.Base.Delimited_Format',
+          definedOnType: 'Standard.Base.Delimited_Format.Delimited_Format',
+          name: 'Delimited',
+        },
+        notAppliedArguments: [0],
+      },
+    )
+    const delimiter = conditionArg(node, 'delimiter')
+    await expect(delimiter).toBeVisible()
+    await delimiter.click()
+    await new DropDownLocator(delimiter).expectVisibleWithOptions(["','", "';'"])
   })
 })
 
