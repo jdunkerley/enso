@@ -637,7 +637,8 @@ make_schema_selector connection include_any:Boolean=False =
    none, every table. `add_custom` is configuration, pre-applied in the
    annotation: whether the `<Table_Name>` and `<Raw_SQL>` entries end the list.
 make_table_name_selector connection (add_custom : Boolean = True) (search : Text = "") -> Widget =
-    tables_to_display = connection.tables name_like=(_like_pattern search) . at "Name" . to_vector
+    tables = if search.is_empty then connection.tables else connection.tables name_like=(_like_pattern search)
+    tables_to_display = tables.at "Name" . to_vector
     table_name_values = tables_to_display.map t-> Option t t.pretty
     values = table_name_values + (if add_custom then [Option '<Table_Name>' '..Table_Name ""', Option '<Raw_SQL>' '..Raw_SQL ""'] else [])
     Single_Choice values=values
@@ -653,7 +654,8 @@ make_table_name_selector connection (add_custom : Boolean = True) (search : Text
 make_table_name_with_schema_selector connection (schema_black_list : Vector = []) (add_custom : Boolean = True) (search : Text = "") -> Widget =
     schema = connection.schema
     schema_text sch = if sch == schema then "" else sch+"."
-    tables = connection.tables name_like=(_like_pattern search) schema="*" . filter "Schema" (..Is_In schema_black_list ..Remove)
+    all_tables = if search.is_empty then connection.tables schema="*" else connection.tables name_like=(_like_pattern search) schema="*"
+    tables = all_tables.filter "Schema" (..Is_In schema_black_list ..Remove)
     table_name_values = tables.rows.map r->
         name = r.at "Name"
         sch = r.at "Schema"
@@ -664,12 +666,12 @@ make_table_name_with_schema_selector connection (schema_black_list : Vector = []
 ## ---
    private: true
    ---
-   The `name_like` pattern of a search: the text with `\`, `%` and `_`
-   escaped by `\`, between `%`s; `Nothing` (every table) for no text.
-private _like_pattern (search : Text) -> Text | Nothing =
-    if search.is_empty then Nothing else
-        escaped = search.replace '\\' '\\\\' . replace "%" '\\%' . replace "_" '\\_'
-        "%" + escaped + "%"
+   The `name_like` pattern of a search text: the text with `\`, `%` and `_`
+   escaped by `\`, between `%`s. (No text asks `tables` without `name_like`:
+   the backends' defaults for it differ.)
+private _like_pattern (search : Text) -> Text =
+    escaped = search.replace '\\' '\\\\' . replace "%" '\\%' . replace "_" '\\_'
+    "%" + escaped + "%"
 
 ## ---
    private: true

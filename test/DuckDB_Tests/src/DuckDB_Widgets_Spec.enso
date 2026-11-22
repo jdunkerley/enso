@@ -25,6 +25,10 @@ add_specs suite_builder =
         ["Sales_2024", "sales_2025", "Costs", "a_b", "aXb"].each name->
             connection.execute_update 'CREATE TABLE "'+name+'" ("x" INTEGER, "label" VARCHAR)'
 
+        group_builder.specify "tables lists the connection's tables by default" <|
+            ## DuckDB's JDBC driver calls a table `TABLE`, not `BASE TABLE`.
+            connection.tables . at "Name" . to_vector . should_contain "Costs"
+
         group_builder.specify "query's table names are searchable" <|
             result = result_of connection "query" "query" search="ales"
             result.get "resolver" . get "searchable" . should_be_true

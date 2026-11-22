@@ -179,7 +179,7 @@ type DuckDB_Connection
     @database (make_database_selector include_any=True)
     @schema (make_schema_selector include_any=True)
     tables : Text -> Text -> Text -> Vector -> Boolean -> Table
-    tables self name_like:Text="" database:Text=self.database schema:Text=self.schema types=["BASE TABLE", "VIEW"] all_fields=False =
+    tables self name_like:Text="" database:Text=self.database schema:Text=self.schema types=["TABLE", "BASE TABLE", "VIEW"] all_fields=False =
         parsed_database = if database == "*" then Nothing else (if database == "" then self.database else database)
         parsed_schema = if schema == "*" then Nothing else (if schema == "" then self.schema else schema)
         self.connection.tables (if name_like == "" then Nothing else name_like) parsed_database parsed_schema types all_fields
