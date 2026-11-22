@@ -51,6 +51,14 @@ raw = conn.query (..Raw_SQL "SELECT id, name FROM users WHERE active = true")
 - `src/Postgres_Family/` — the PostgreSQL dialect, type mapping, error mapper
   and encoding helpers that Postgres, DuckDB and Redshift share. Not exported
   from `Main.enso`; other libraries import the modules directly.
+- `src/Connection/Connection.enso` — the table-name pickers every backend uses,
+  `make_table_name_selector` and `make_table_name_with_schema_selector`, are
+  searchable resolvers: with the IDE's search text they ask `tables name_like=…`
+  (the text, its `\`, `%` and `_` escaped, between `%`s: the database's own
+  match, case-sensitive on DuckDB), without it they list every table. Their
+  configuration (`add_custom`, `schema_black_list`) is pre-applied in each
+  annotation, as `make_schema_selector`'s `include_any` and Snowflake's
+  `make_stage_selector`'s `include_home` are.
 - `src/Internal/DB_Table_Implementation.enso` — `DB_Table`'s `Widget_Columns`
   must never query the database: it reads a column's type with
   `SQL_Type_Reference.known`, which is `Nothing` for a type not fetched yet

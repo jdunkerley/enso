@@ -19,6 +19,20 @@ The IR itself lives in `engine/runtime-parser`.
   The standard library build runs `lintEnso` with `-Werror`, so a warning fails
   it. A doc on the first definition of a module without imports is the module's
   doc and is not checked.
+- **`pass/lint/ResolverSignatureCheck`** (`Warning.ResolverSignature`) checks
+  widget resolvers, the functions given as an argument's annotation: past the
+  first (the subject), every open parameter must be an argument of the annotated
+  method defaulted to `Nothing`, or `search` (a `Text` defaulted to `""`). It
+  reads a lambda's parameters, or those of the module method the annotation's
+  head resolves to (GlobalNames / MethodCalls metadata, or a synthetic self
+  argument naming a module; the module being compiled is read from the pass's
+  own IR, any other through its `Module.getIr`), minus the arguments the
+  annotation applies. A head it cannot resolve to a module method (a
+  constructor, a type's method such as `Widget.from`) is skipped; an application
+  whose head is a lambda is reported as a computed resolver. The warning is
+  attached to the method or constructor (annotations live in metadata, which
+  diagnostics reporting does not walk) at the annotation's location. `lintEnso`
+  runs it with `-Werror`, test projects included.
 - Pass metadata that goes into IR caches is registered in
   `pass/analyse/PassPersistance.java` with explicit `@Persistable` ids.
 - **`X.type` names X's eigentype in a type position** (a conversion's source, an

@@ -84,6 +84,16 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
   never copy column names into a widget.
 - Add `kinds=[Column_Kind.Numeric]` (and so on) only where the method rejects
   other kinds with a type error; leave it off where any column is fine.
+- **A widget that depends on another argument is a resolver** (Base's
+  `CLAUDE.md`, "Resolvers"): write the dependency as a parameter named after the
+  argument, defaulted to `Nothing`
+  (`make_filter_condition_selector table (column = Nothing)`), and pre-apply
+  configuration in the annotation or write a lambda of the table
+  (`@term (table-> Widget_Helpers.make_column_ref_by_name_selector table add_text=True)`).
+  Never cache a widget on the table (`TableValueCache` is the table view's).
+  `Simple_Expression` and `Generate_Rows_Range` have resolver defaults
+  (`Widget.from … = Widget.Resolver …`), used by `@value`/`@over` as
+  `(Widget.from X)`.
 - The builders in `src/Internal/Widget_Helpers.enso` return references too. A
   composite builder nests the references of its parts as the options of a
   grouped choice; it does not build a column list (except rename's item default,
