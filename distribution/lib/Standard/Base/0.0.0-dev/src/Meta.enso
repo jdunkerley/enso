@@ -466,6 +466,25 @@ get_method_annotation (module_name : Text) (type_name : Text) (method_name : Tex
 ## ---
    private: true
    ---
+   The names of the parameters of exactly the method `method_name` that the
+   module `module_name` defines on `type_name` (looked up as
+   `get_method_annotation` looks it up), `self` excluded, in order. The IDE's
+   widget query checks a resolver's parameters against them.
+
+   ## Arguments
+    - `module_name`: The qualified name of the module that defines the method.
+    - `type_name`: The qualified name of the type (or module) it is defined on.
+    - `method_name`: The method's or constructor's name.
+
+   ## Returns
+   The parameter names. A `No_Such_Method` or `Module_Does_Not_Exist` error
+   when there is no such method.
+get_method_argument_names (module_name : Text) (type_name : Text) (method_name : Text) -> Vector Text =
+    @Tail_Call Meta_Helpers.get_method_argument_names_builtin module_name type_name method_name
+
+## ---
+   private: true
+   ---
    The type named `qualified_name`, or else the module of that name (the type
    its module methods are defined on). A type wins over a module of the same
    name: `Standard.Base.Data.Boolean.Boolean` is the type.

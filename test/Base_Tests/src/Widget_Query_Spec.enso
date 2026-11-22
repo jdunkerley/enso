@@ -151,6 +151,11 @@ add_specs suite_builder =
             Meta.call_module_method "enso_dev.Base_Tests.No_Such_Module" "f" [] 1 . should_fail_with Module_Does_Not_Exist
             Meta.call_module_method spec_module "no_such_method" [] 1 . should_fail_with No_Such_Method
 
+    suite_builder.group "Meta.get_method_argument_names" group_builder->
+        group_builder.specify "lists a method's parameters, self excluded" <|
+            Meta.get_method_argument_names spec_module sample_type "two" . should_equal ["first", "second"]
+            Meta.get_method_argument_names spec_module spec_module "add_defaults" . should_equal ["a", "b", "c"]
+            Meta.get_method_argument_names spec_module sample_type "nope" . should_fail_with No_Such_Method
 
     suite_builder.group "Widget_Query.resolve_call finds exactly the method a call names" group_builder->
         sample = Sample.Value "a label"
