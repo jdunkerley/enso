@@ -69,6 +69,7 @@ const { methodCallInfo, application, subject, subjectInfo } = useWidgetFunctionC
   () => typeDefaults.value,
   () => schemaCache.value,
   () => staticAnswers.value,
+  () => suggestionDb.value.entries,
 )
 
 // A file dropped on the graph (#489) matches the format options a node here has already loaded.

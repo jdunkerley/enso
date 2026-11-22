@@ -93,9 +93,27 @@ render only its own slot content. The icon is already on the row, drawn by
     placeholders and text literals. `WidgetFileBrowser` claims a browse
     configuration, and otherwise only an argument of a declared `File`,
     `Writable_File` or `Enso_Secret` type whose configuration is an annotation's
-    `Single_Choice` or still `Pending` (the browse items join its options),
-    never under the kind picker and never from the type alone. An annotation's
-    configuration keeps claiming whatever the argument holds.
+    `Single_Choice` or `Text_Input`, or still `Pending` (the browse items join
+    its options, or sit in a dropdown over the text input: `Data.read`'s `path`
+    is `@path (Text_Input)` on `Text | URI | File`), never under the kind picker
+    and never from the type alone. An annotation's configuration keeps claiming
+    whatever the argument holds. A test of a browsable argument should answer
+    what the engine answers for it: a mocked `Single_Choice` hid the
+    `Text_Input` case (#926).
+  - **An offered auto-scoped constructor resolves without the engine**
+    (`deriveAutoscopedCallInfo` in `@/util/callTree`, used by
+    `widgetFunctionCallInfo.ts`): the engine resolves `..Equals` only when the
+    call it is passed to reads it, and a call that fails first never does
+    (`table.join on=[(..Equals 'county')]` without `right`: no call info, so no
+    `left`/`right` and nothing to enter). When the engine has no call info and
+    the parent's choice offers `..Name`, the constructor is taken from the
+    suggestion database: the one of that name whose type the expected type
+    names, else the only one of that name.
+  - **A submenu stays open while its item is in sight**
+    (`WidgetSelection/SelectionSubmenu.vue`): a list longer than the dropdown
+    scrolls, and clicking a partly hidden group (`filter`'s `Text →`) scrolls it
+    into view; only a scroll that takes the item out of sight closes its
+    submenu.
   - **A type default does not set the browse mode** (R9): `useBrowserTypeInfo`
     treats it as no configuration, so the declared type decides. A
     `File | Enso_Secret` union is a kind picker with File and Secret kinds, and

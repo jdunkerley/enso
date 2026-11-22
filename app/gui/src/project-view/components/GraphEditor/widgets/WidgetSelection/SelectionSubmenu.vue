@@ -78,8 +78,20 @@ function onClick(entry: T, keepOpen: boolean, htmlElement: HTMLElement) {
   }
 }
 
-function onScroll() {
+/**
+ * The list scrolled: the submenu closes once the item it hangs from is out of sight. Clicking an
+ * item the list shows only in part scrolls it into view, and that scroll must not close the submenu
+ * the same click opened (a group at the end of a long list, such as `filter`'s `Text →`, could
+ * never be opened). While the item stays in sight, `autoUpdate` keeps the submenu beside it.
+ */
+function onScroll(list: HTMLElement) {
+  const item = submenu.value?.relativeTo
+  if (item && isInSight(item.getBoundingClientRect(), list.getBoundingClientRect())) return
   submenu.value = null
+}
+
+function isInSight(item: DOMRect, list: DOMRect): boolean {
+  return item.height > 0 && item.bottom > list.top && item.top < list.bottom
 }
 
 /** Check if the event target is outside the current submenu and any of its descendants. */

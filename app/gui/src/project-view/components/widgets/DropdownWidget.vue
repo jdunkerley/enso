@@ -9,7 +9,8 @@ type SortDirection = 'none' | 'ascending' | 'descending'
 const props = defineProps<{ entries: Entry[] }>()
 const emit = defineEmits<{
   clickEntry: [entry: Entry, keepOpen: boolean, htmlElement: HTMLElement]
-  scroll: []
+  /** The list scrolled; `list` is the scrolled element. */
+  scroll: [list: HTMLElement]
 }>()
 
 const sortDirection = ref<SortDirection>('none')
@@ -62,7 +63,11 @@ export interface DropdownEntry {
 
 <template>
   <div class="DropdownWidget" :style="styleVars">
-    <ul class="list scrollable" @wheel.stop.passive @scroll="emit('scroll')">
+    <ul
+      class="list scrollable"
+      @wheel.stop.passive
+      @scroll="emit('scroll', $event.currentTarget as HTMLElement)"
+    >
       <li v-for="entry in sortedValues" :key="entry.key ?? entry.value">
         <button
           :class="{ selected: entry.selected }"

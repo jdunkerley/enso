@@ -4,11 +4,13 @@ import * as widgetCfg from '$/providers/openedProjects/widgetRegistry/configurat
 import { syntheticPortId, type PortId } from '@/providers/portInfo'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { GraphDb, MethodCallInfo } from '$/providers/openedProjects/graph/graphDatabase'
-import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
+import type { GroupInfo, SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import type { ArgumentDisplay } from '$/providers/openedProjects/suggestionDatabase/documentation'
 import {
   isRequiredArgument,
+  SuggestionKind,
   type CallableSuggestionEntry,
+  type ConstructorSuggestionEntry,
   type SuggestionEntryArgument,
 } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { MethodSuggestionEntryImpl } from '$/providers/openedProjects/suggestionDatabase/lsUpdate'
@@ -21,6 +23,10 @@ import type { ExternalId } from 'ydoc-shared/yjsModel'
 import type { ToValue } from '../../utils/reactivity'
 import { assert } from './assert'
 import type { MethodPointer } from './methodPointer'
+import {
+  isIdentifierOrOperatorIdentifier,
+  type IdentifierOrOperatorIdentifier,
+} from './qualifiedName'
 
 export const enum ApplicationKind {
   Prefix,
@@ -645,6 +651,67 @@ export function deriveLocalCallInfoFromCode(
     suggestion,
     methodCallSource: call.id,
     methodCall: { methodPointer, notAppliedArguments },
+  }
+}
+
+/**
+ * The name of the auto-scoped constructor `call` applies (`Equals` for `..Equals 'a'` or a bare
+ * `..Equals`), if it is one.
+ */
+export function autoscopedConstructorName(
+  call: Ast.Expression,
+): IdentifierOrOperatorIdentifier | undefined {
+  let head: Ast.Ast = call
+  while (head instanceof Ast.App) head = head.function
+  if (!(head instanceof Ast.AutoscopedIdentifier)) return
+  const name = head.identifier.code()
+  return isIdentifierOrOperatorIdentifier(name) ? name : undefined
+}
+
+/**
+ * Call info for an auto-scoped constructor call (`..Equals 'county'`) that the engine has not
+ * resolved, from the suggestion database. The engine resolves `..Equals` only when the call it is
+ * passed to reads it, and a call that fails first never does: `table.join on=[(..Equals 'county')]`
+ * without `right` gets its `Missing_Argument` before `join`'s body runs, so the condition had no
+ * argument placeholders and its `right` could not be entered (#926).
+ *
+ * The caller asks only for a constructor a parent's choice offers (its `..Equals` option), so the
+ * name is meant as a constructor. Of the constructors with that name, the one whose type
+ * `expectedType` names is taken (any member of a union, or a type inside a `Vector`); without an
+ * expected type, or if it names none of them, only a name that a single constructor has resolves.
+ */
+export function deriveAutoscopedCallInfo(
+  call: Ast.Expression,
+  suggestionDb: SuggestionDb,
+  expectedType: string | undefined,
+): MethodCallInfo | undefined {
+  const name = autoscopedConstructorName(call)
+  if (name == null) return
+  const constructors: ConstructorSuggestionEntry[] = []
+  for (const id of suggestionDb.conflictingNames.lookup(name)) {
+    const entry = suggestionDb.get(id)
+    if (entry?.kind === SuggestionKind.Constructor) constructors.push(entry)
+  }
+  const named = new Set(expectedType?.match(/[A-Za-z_][\w.]*/g) ?? [])
+  const expected = constructors.filter((entry) => {
+    const type = entry.memberOf.path
+    return type != null && [...named].some((qn) => qn === type || qn.endsWith('.' + type))
+  })
+  const suggestion =
+    expected.length === 1 ? expected[0]
+    : constructors.length === 1 ? constructors[0]
+    : undefined
+  if (suggestion == null) return
+  return {
+    suggestion,
+    methodCallSource: call.id,
+    methodCall: {
+      methodPointer: { module: suggestion.definedIn, definedOnType: suggestion.memberOf, name },
+      notAppliedArguments: filterNotAppliedArguments(
+        getCallAppliedArguments(call),
+        suggestion.arguments,
+      ),
+    },
   }
 }
 

@@ -1,7 +1,9 @@
 /* eslint-disable camelcase */
 import { describe, expect, test } from 'vitest'
+import { SchemaCache } from '../columnPickers'
 import {
   functionCallFromAnswer,
+  singleChoiceConfiguration,
   widgetQueryAnswerSchema,
   type FunctionCall,
 } from '../configuration'
@@ -157,6 +159,95 @@ describe('functionCallFromAnswer', () => {
       kind: 'Single_Choice',
       values: [{ label: 'A', value: "'A'", parameters: [] }],
     })
+  })
+
+  // The owner's #926 case, as `Table.filter` answers it: the inner call (`..Contains`, a
+  // constructor with no annotations of its own) gets its operand's widget only from the choice it
+  // was picked from, through `singleChoiceConfiguration`, with the subject's columns expanded.
+  test("a grouped option's picker reaches the inner call's parameters", () => {
+    const operand = {
+      constructor: 'Column_Name',
+      kinds: ['Textual'],
+      from: null,
+      expression: true,
+      reference: true,
+      extra: [{ label: '<Text Value>', value: '""', parameters: [], icon: '' }],
+      columns_first: false,
+    }
+    const option = (value: string, parameters: unknown[] = []) => ({
+      label: value,
+      value,
+      parameters,
+      icon: '',
+    })
+    const answer = widgetQueryAnswerSchema.parse({
+      arguments: [
+        [
+          'filter',
+          {
+            widget: {
+              constructor: 'Single_Choice',
+              values: [
+                option('..Equal', [['to', operand]]),
+                {
+                  label: 'Comparisons',
+                  value: [
+                    option('..Between', [
+                      ['lower', operand],
+                      ['upper', operand],
+                    ]),
+                  ],
+                  parameters: [],
+                  icon: '',
+                },
+                {
+                  label: 'Text',
+                  value: [
+                    option('..Starts_With', [['prefix', operand]]),
+                    option('..Ends_With', [['suffix', operand]]),
+                    option('..Contains', [['substring', operand]]),
+                  ],
+                  parameters: [],
+                  icon: '',
+                },
+              ],
+            },
+          },
+        ],
+      ],
+      columns: {
+        '': {
+          names: ['county', 'n', '[county]'],
+          kinds: ['Textual', 'Numeric', 'Textual'],
+          type_names: ['Char', 'Integer', 'Char'],
+        },
+      },
+    })
+    const filter = functionCallFromAnswer(answer, undefined, new SchemaCache()).parameters.get(
+      'filter',
+    )
+    expect(filter?.kind).toBe('Single_Choice')
+    if (filter?.kind !== 'Single_Choice') return
+    const inner = singleChoiceConfiguration(filter)
+    const expected = {
+      kind: 'Single_Choice',
+      values: [
+        { label: '<Text Value>', value: '""', parameters: [], icon: '' },
+        { label: '<Expression>', value: "(expr '[county]')", parameters: [] },
+        { label: 'county', value: "(..Name 'county')", parameters: [] },
+        { label: '[county]', value: "(..Name '[county]')", parameters: [] },
+      ],
+    }
+    for (const [call, argument] of [
+      ['..Contains', 'substring'],
+      ['..Starts_With', 'prefix'],
+      ['..Ends_With', 'suffix'],
+      ['..Equal', 'to'],
+      ['..Between', 'lower'],
+      ['..Between', 'upper'],
+    ] as const) {
+      expect(inner.possibleFunctions.get(call)?.parameters.get(argument), call).toEqual(expected)
+    }
   })
 
   test('keeps the errors apart from the widgets', () => {
