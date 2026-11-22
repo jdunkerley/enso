@@ -37,6 +37,18 @@ check_default typ =
     type_name = Meta.meta typ . qualified_name
     Widget_Query.resolve_type type_name . should_equal ('{"widget":' + widget.to_json + '}')
 
+## A table of `width` columns of five kinds and 1000 rows; SQLite stores dates as text. Copied from the widget benchmark.
+make_table width =
+    columns = 0.up_to width . map i->
+        values = case i % 5 of
+            0 -> 0.up_to 1000 . map j-> j+i
+            1 -> 0.up_to 1000 . map j-> (j*0.5)+i
+            2 -> 0.up_to 1000 . map j-> "t"+(j%50).to_text
+            3 -> 0.up_to 1000 . map j-> ((Date.new 2020 1 1) + (Period.new days=(j%365))).to_text
+            _ -> 0.up_to 1000 . map j-> (j%2)==0
+        ["c"+i.to_text, values]
+    Table.new columns
+
 add_specs suite_builder =
     connection = Database.connect (SQLite.In_Memory)
     connection.execute_update 'CREATE TABLE "mock_table" ("A" VARCHAR, "B C" INTEGER, "D ""E""" BOOLEAN, "F.G/H\\I" REAL)'
@@ -97,6 +109,17 @@ add_specs suite_builder =
             result.should_contain "DuckDB"
             result.should_contain "Snowflake"
             result.should_contain "Microsoft SQL Server"
+
+    suite_builder.group "Widget answers for 500 columns stay under 50 KB" group_builder->
+        group_builder.specify "every baseline method" <|
+            connection = Database.connect (SQLite.In_Memory)
+            wide = make_table 500
+            table = wide.select_into_database_table connection "wide_500" temporary=True
+            [["select_columns", ["columns"]], ["sort", ["columns"]], ["get", ["selector"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["cross_tab", ["group_by", "names", "values"]], ["join", ["on", "join_kind"]]].each query->
+                answer = Widget_Query.resolve_call table table_module table_type query.first query.second
+                Test.with_clue (query.first + ": ") <|
+                    answer.should_not_contain '"error"'
+                    (answer.length < 50*1024) . should_be_true
 
     suite_builder.group "Type defaults by conversion" group_builder->
         group_builder.specify "Connection_Options" <| check_default Connection_Options

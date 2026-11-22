@@ -29,17 +29,20 @@ make_table width (date_as_text : Boolean = False) =
     Table.new columns
 
 ## The baseline's widget queries: method and arguments.
-queries = [["select_columns", ["columns"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["join", ["on"]]]
+queries = [["select_columns", ["columns"]], ["sort", ["columns"]], ["get", ["selector"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["cross_tab", ["group_by", "names", "values"]], ["join", ["on"]]]
 
 ## The tables, built when first used. `duckdb` is `Nothing` where DuckDB
    cannot start (the benchmark job also runs off Linux).
 type Data
-    Value ~memory ~sqlite ~duckdb
+    Value ~memory ~recomputed ~sqlite ~duckdb
 
     create =
         upload table connection = if connection.is_nothing then Nothing else
             table.select_into_database_table connection ("t"+column_count.to_text) temporary=True
-        Data.Value (make_table column_count) (upload (make_table column_count True) (Database.connect (SQLite.In_Memory))) (upload (make_table column_count) connect_duckdb)
+        memory = make_table column_count
+        ## Same schema, new version hash: `c0` is recomputed.
+        recomputed = memory.set (memory.at "c0" + 1) as="c0"
+        Data.Value memory recomputed (upload (make_table column_count True) (Database.connect (SQLite.In_Memory))) (upload (make_table column_count) connect_duckdb)
 
 ## An in-memory DuckDB connection, or `Nothing` where DuckDB cannot start. Only
    the lazy `duckdb` field calls it, so compiling or setting up the benchmarks
@@ -56,7 +59,7 @@ type Backend
 backends =
     table_module = "Standard.Table.Table"
     table_type = "Standard.Table.Table.Table"
-    [Backend.Value "In_Memory" (d-> d.memory) table_module table_type, Backend.Value "SQLite" (d-> d.sqlite) table_module table_type, Backend.Value "DuckDB" (d-> d.duckdb) table_module table_type]
+    [Backend.Value "In_Memory" (d-> d.memory) table_module table_type, Backend.Value "In_Memory_Recomputed" (d-> d.recomputed) table_module table_type, Backend.Value "SQLite" (d-> d.sqlite) table_module table_type, Backend.Value "DuckDB" (d-> d.duckdb) table_module table_type]
 
 ## One widget query, as the IDE makes it; `Nothing` when the backend is absent.
 run_query (backend : Backend) data query =
