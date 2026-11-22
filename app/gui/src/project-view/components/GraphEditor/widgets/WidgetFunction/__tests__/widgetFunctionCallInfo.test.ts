@@ -16,7 +16,12 @@ import {
   makeStaticMethod,
 } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
+import { StaticAnswerCache } from '$/providers/openedProjects/widgetRegistry/staticAnswerCache'
 import type { TypeDefaults } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
+import {
+  RESOLVER_TIME_BOX_MS,
+  SEARCH_DEBOUNCE_MS,
+} from '$/providers/openedProjects/widgetRegistry/widgetQueryPlan'
 import {
   RESOLVE_CALL_POINTER,
   WIDGET_QUERY_MODULE,
@@ -24,12 +29,21 @@ import {
 import { useWidgetFunctionCallInfo } from '@/components/GraphEditor/widgets/WidgetFunction/widgetFunctionCallInfo'
 import { assert } from '@/util/assert'
 import { Ast } from '@/util/ast'
-import { ArgumentApplication } from '@/util/callTree'
+import { ArgumentApplication, WidgetSearchKey } from '@/util/callTree'
 import type { MethodPointer } from '@/util/methodPointer'
 import type { Opt } from 'enso-common/src/utilities/data/opt'
 import { Ok, type Result } from 'enso-common/src/utilities/data/result'
-import { expect, test, vi } from 'vitest'
-import { effectScope, nextTick, ref, shallowRef, toValue, type Ref, type WatchSource } from 'vue'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import {
+  effectScope,
+  nextTick,
+  reactive,
+  ref,
+  shallowRef,
+  toValue,
+  type Ref,
+  type WatchSource,
+} from 'vue'
 import { SourceRange } from 'ydoc-shared/util/data/text'
 
 vi.mock('$/providers/engineLogAppend', () => ({
@@ -125,8 +139,9 @@ test.each`
       } as GraphDb,
       {
         useVisualizationData(config) {
-          expect(visConfig, 'Only one visualization is expected').toBeUndefined()
-          visConfig = config
+          // The node's query is the first; the second is the search query, idle without text.
+          if (visConfig == null) visConfig = config
+          else expect(toValue(config), 'Only one visualization is attached').toBeNull()
           return ref(null)
         },
         moduleProjectPath: projectNames.parseProjectPathRaw('local.Project.Main'),
@@ -270,4 +285,370 @@ test('an answer expands its column pickers from the columns it sends', () => {
     kind: 'Single_Choice',
     values: [{ label: 'A', value: "'A'", parameters: [] }],
   })
+})
+
+// ---------------------------------------------------------------------------------------------
+// Resolvers: the query follows the plan (widgetQueryPlan.ts), notes, the time-box and search.
+// ---------------------------------------------------------------------------------------------
+
+const join = makeMethod('local.Project.Type.join', {
+  returnType: 'local.Project.Type',
+  args: [
+    makeArgument('self'),
+    makeArgument('right'),
+    makeArgument('on'),
+    makeArgument('join_kind'),
+  ],
+  annotations: ['on'],
+  projectNames,
+})
+const tables = makeMethod('local.Project.Type.tables', {
+  returnType: 'local.Project.Type',
+  args: [makeArgument('self'), makeArgument('query')],
+  annotations: ['query'],
+  projectNames,
+})
+
+const textInput = { constructor: 'Text_Input' }
+const boolInput = { constructor: 'Boolean_Input' }
+const onResolver = { dependencies: ['self', 'right'], searchable: false }
+
+/** The text of an Enso text literal's code. */
+function literal(code: string | undefined): string {
+  const ast = code == null ? undefined : Ast.parseExpression(code)
+  assert(ast instanceof Ast.TextLiteral)
+  return ast.rawTextContent
+}
+
+/** The extra arguments (search, type defaults, revision) of a query, or `[]` when it sent none. */
+function extras(config: Opt<NodeVisualizationConfiguration>) {
+  return (config?.positionalArgumentsExpressions ?? []).slice(6)
+}
+
+/** A node of `code` whose node query and search query are fakes recording their configurations. */
+function setUpResolverQuery(
+  code: string,
+  callSuggestion: SuggestionEntry,
+  options: {
+    staticAnswers?: StaticAnswerCache
+    typeDefaults?: Pick<TypeDefaults, 'lookup' | 'resolverDefault'>
+  } = {},
+) {
+  const { ast, id } = parseWithSpans(code, {
+    entireFunction: SourceRange.fromStartAndLength(0, code.length),
+  })
+  const statement = ast.lines[0]?.statement?.node
+  assert(statement instanceof Ast.ExpressionStatement)
+  // Computed values by expression id; a new payload object is a recomputed value.
+  const values = reactive(new Map<string, { payload: { type: 'Value' } }>())
+  const queries: (() => Opt<NodeVisualizationConfiguration>)[] = []
+  const data = [shallowRef<Result<unknown> | null>(null), shallowRef<Result<unknown> | null>(null)]
+  const scope = effectScope()
+  const info = scope.run(() =>
+    useWidgetFunctionCallInfo(
+      WidgetInput.FromAst(statement.expression),
+      {
+        getMethodCallInfo(astId) {
+          if (astId === id('entireFunction')) {
+            return {
+              suggestion: callSuggestion,
+              methodCallSource: astId,
+              methodCall: { notAppliedArguments: [], methodPointer: callPointer(callSuggestion) },
+            }
+          }
+        },
+        getExpressionInfo(exprId) {
+          return values.get(exprId as string) as never
+        },
+        isNodeUsage: () => false,
+      } as GraphDb,
+      {
+        useVisualizationData(config) {
+          const index = queries.length
+          queries.push(() => toValue(config))
+          return data[index]!
+        },
+        moduleProjectPath: projectNames.parseProjectPathRaw('local.Project.Main'),
+        assetId: 'project-id',
+      },
+      projectNames,
+      [],
+      options.typeDefaults,
+      undefined,
+      options.staticAnswers,
+    ),
+  )!
+  const nodeQuery = () => queries[0]!()
+  const searchQuery = () => queries[1]!()
+  const sentUuids = (): Record<string, string> =>
+    JSON.parse(literal(nodeQuery()?.positionalArgumentsExpressions?.[4]))
+  /** Expression ids of the call's arguments, as the first query sent them all. */
+  const argumentIds: Record<string, string> = nodeQuery() != null ? sentUuids() : {}
+  const recompute = (name: string) => values.set(argumentIds[name]!, { payload: { type: 'Value' } })
+  const answer = (value: unknown) => (data[0]!.value = Ok(value))
+  const answerSearch = (value: unknown) => (data[1]!.value = Ok(value))
+  const param = (name: string) => info.widgetConfiguration.value.parameters.get(name)
+  const note = (name: string) => info.widgetConfiguration.value.notes?.get(name)
+  const revision = () => literal(extras(nodeQuery())[2])
+  return {
+    info,
+    scope,
+    nodeQuery,
+    searchQuery,
+    sentUuids,
+    argumentIds,
+    recompute,
+    answer,
+    answerSearch,
+    param,
+    note,
+    revision,
+  }
+}
+
+describe('the query follows the declared dependencies', () => {
+  test('the first query sends every argument, and its answer asks nothing more', () => {
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join)
+    expect(Object.keys(q.argumentIds)).toEqual(expect.arrayContaining(['join_kind', 'on', 'right']))
+    expect(extras(q.nodeQuery())).toEqual([])
+    const first = q.nodeQuery()
+    q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
+    expect(q.param('on')).toMatchObject({ kind: 'Text_Input' })
+    expect(q.nodeQuery()).toBe(first)
+  })
+
+  test('a new computed value of `right` re-queries with only its id and a new revision', () => {
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join)
+    q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
+    q.recompute('right')
+    expect(q.sentUuids()).toEqual({ right: q.argumentIds['right'] })
+    const revision = q.revision()
+    expect(revision).not.toBe('')
+    q.recompute('right')
+    expect(q.revision()).not.toBe(revision)
+  })
+
+  test('changing `join_kind` does not change the query', () => {
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join)
+    q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
+    const before = q.nodeQuery()
+    q.recompute('join_kind')
+    q.recompute('on')
+    expect(q.nodeQuery()).toBe(before)
+  })
+
+  test('an answer with a stale revision is ignored; the current one is taken', () => {
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join)
+    q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
+    q.recompute('right')
+    q.answer({
+      arguments: [['on', { widget: boolInput, resolver: onResolver }]],
+      revision: 'stale',
+    })
+    expect(q.param('on')).toMatchObject({ kind: 'Text_Input' })
+    q.answer({
+      arguments: [['on', { widget: boolInput, resolver: onResolver }]],
+      revision: q.revision(),
+    })
+    expect(q.param('on')).toMatchObject({ kind: 'Boolean_Input' })
+  })
+
+  test('the answer present when a query is sent is not taken as its answer', () => {
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join)
+    q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
+    const first = q.nodeQuery()
+    q.recompute('right')
+    expect(q.nodeQuery()).not.toBe(first)
+    // Nothing new has arrived: still waiting, the previous widget shows.
+    expect(q.param('on')).toMatchObject({ kind: 'Text_Input' })
+  })
+})
+
+describe('static answers', () => {
+  test('are kept per method, and the next node of the method sends no query', () => {
+    const cache = new StaticAnswerCache()
+    const first = setUpResolverQuery('val1.method val2', method, { staticAnswers: cache })
+    expect(first.nodeQuery()).not.toBeNull()
+    first.answer({ arguments: [['arg', { widget: boolInput }]] })
+    // The cache answers now: the node's own query is detached.
+    expect(first.nodeQuery()).toBeNull()
+    expect(first.param('arg')).toMatchObject({ kind: 'Boolean_Input' })
+    const second = setUpResolverQuery('val3.method val4', method, { staticAnswers: cache })
+    expect(second.nodeQuery()).toBeNull()
+    expect(second.param('arg')).toMatchObject({ kind: 'Boolean_Input' })
+  })
+
+  test('an answer with a resolver is not kept', () => {
+    const cache = new StaticAnswerCache()
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join, { staticAnswers: cache })
+    q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
+    expect(cache.size).toBe(0)
+    expect(q.nodeQuery()).not.toBeNull()
+  })
+})
+
+describe('notes and the time-box', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  test('an unavailable dependency shows no widget and a note', () => {
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join)
+    q.answer({
+      arguments: [
+        [
+          'on',
+          {
+            widget: null,
+            resolver: onResolver,
+            unavailable: { dependency: 'right', message: 'x' },
+          },
+        ],
+      ],
+    })
+    expect(q.param('on')).toBeUndefined()
+    expect(q.note('on')).toEqual({ kind: 'unavailable', dependency: 'right', message: 'x' })
+  })
+
+  test('the first query is pending for 2 s, then the fallback with a loading note', () => {
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join)
+    vi.advanceTimersByTime(RESOLVER_TIME_BOX_MS - 1)
+    expect(q.param('on')?.kind).toBe('Pending')
+    expect(q.note('on')).toBeUndefined()
+    vi.advanceTimersByTime(1)
+    expect(q.param('on')).toBeUndefined()
+    expect(q.note('on')).toEqual({ kind: 'loading' })
+    q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
+    expect(q.param('on')).toMatchObject({ kind: 'Text_Input' })
+    expect(q.note('on')).toBeUndefined()
+  })
+
+  test('a re-query keeps the previous widget for 2 s, then shows the loading fallback', () => {
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join)
+    q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
+    q.recompute('right')
+    vi.advanceTimersByTime(RESOLVER_TIME_BOX_MS - 1)
+    expect(q.param('on')).toMatchObject({ kind: 'Text_Input' })
+    vi.advanceTimersByTime(1)
+    expect(q.param('on')).toBeUndefined()
+    expect(q.note('on')).toEqual({ kind: 'loading' })
+    q.answer({
+      arguments: [['on', { widget: boolInput, resolver: onResolver }]],
+      revision: q.revision(),
+    })
+    expect(q.param('on')).toMatchObject({ kind: 'Boolean_Input' })
+    expect(q.note('on')).toBeUndefined()
+  })
+
+  test('the time-box stops with the scope', () => {
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join)
+    q.scope.stop()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+describe('search as you type', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  const searchable = { dependencies: ['self'], searchable: true }
+  const choices = (...names: string[]) => ({
+    constructor: 'Single_Choice',
+    values: names.map((name) => ({ value: `'${name}'`, label: name, parameters: [] })),
+  })
+  const searchOf = (config: Opt<NodeVisualizationConfiguration>) => literal(extras(config)[0])
+
+  function searchableNode() {
+    const q = setUpResolverQuery('val1.tables val2', tables)
+    q.answer({ arguments: [['query', { widget: choices('a', 'sales'), resolver: searchable }]] })
+    const onSearch = q.info.widgetConfiguration.value.onSearch
+    assert(onSearch != null)
+    return { ...q, onSearch }
+  }
+
+  test('typing within the debounce sends one query, with the latest text', () => {
+    const q = searchableNode()
+    q.onSearch('query', 's')
+    vi.advanceTimersByTime(100)
+    q.onSearch('query', 'sa')
+    vi.advanceTimersByTime(100)
+    q.onSearch('query', 'sal')
+    expect(q.searchQuery()).toBeNull()
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS)
+    const sent = q.searchQuery()
+    expect(searchOf(sent)).toBe('sal')
+    expect(sent!.positionalArgumentsExpressions![3]).toBe("['query']")
+  })
+
+  test('the latest text wins, and its answer replaces the widget', () => {
+    const q = searchableNode()
+    q.onSearch('query', 'sal')
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS)
+    q.answerSearch({
+      arguments: [['query', { widget: choices('sa_old'), resolver: searchable }]],
+      search: 'sa',
+    })
+    expect(q.param('query')).toMatchObject({ values: [{ label: 'a' }, { label: 'sales' }] })
+    q.answerSearch({
+      arguments: [['query', { widget: choices('sales'), resolver: searchable }]],
+      search: 'sal',
+    })
+    expect(q.param('query')).toMatchObject({ values: [{ label: 'sales' }] })
+  })
+
+  test('empty text sends nothing and drops the search answer', () => {
+    const q = searchableNode()
+    q.onSearch('query', 'sal')
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS)
+    q.answerSearch({
+      arguments: [['query', { widget: choices('sales'), resolver: searchable }]],
+      search: 'sal',
+    })
+    q.onSearch('query', '')
+    expect(q.searchQuery()).toBeNull()
+    expect(q.param('query')).toMatchObject({ values: [{ label: 'a' }, { label: 'sales' }] })
+  })
+
+  test('a call with no searchable argument offers no search', () => {
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join)
+    q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
+    expect(q.info.widgetConfiguration.value.onSearch).toBeUndefined()
+    const application = q.info.application.value
+    assert(application instanceof ArgumentApplication)
+    for (const app of application.iterApplications())
+      expect(app.argument.toWidgetInput()[WidgetSearchKey]).toBeUndefined()
+  })
+
+  test('a searchable argument gets the search callback on its input', () => {
+    const q = searchableNode()
+    const application = q.info.application.value
+    assert(application instanceof ArgumentApplication)
+    const query = [...application.iterApplications()].find(
+      (app) => app.argument.argInfo?.name === 'query',
+    )
+    const callback = query?.argument.toWidgetInput()[WidgetSearchKey]
+    assert(callback != null)
+    callback('sal')
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS)
+    expect(searchOf(q.searchQuery())).toBe('sal')
+  })
+})
+
+test('an argument whose type default is a resolver is resolved by the query', () => {
+  const GEO = 'Standard.DuckDB.DuckDB_GeoFormat.DuckDB_GeoFormat'
+  const read = makeMethod('local.Project.Type.read', {
+    returnType: 'local.Project.Type',
+    args: [makeArgument('self'), makeArgument('query'), makeArgument('format', GEO)],
+    annotations: ['query'],
+    projectNames,
+  })
+  const q = setUpResolverQuery('val1.read val2 val3', read, {
+    typeDefaults: {
+      lookup: () => undefined,
+      resolverDefault: (type) =>
+        type === GEO ? { dependencies: ['self'], searchable: false } : undefined,
+    },
+  })
+  const args = q.nodeQuery()!.positionalArgumentsExpressions!
+  expect(args[3]).toBe("['query', 'format']")
+  expect(JSON.parse(literal(args[7]))).toEqual({ format: GEO })
 })

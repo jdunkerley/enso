@@ -54,6 +54,7 @@ const {
   suggestionDb,
   typeDefaults,
   schemaCache,
+  staticAnswers,
 } = useCurrentProject()
 
 const exprInfo = computed(() => graph.value.db.getExpressionInfo(props.input.value.externalId))
@@ -67,6 +68,7 @@ const { methodCallInfo, application, subject, subjectInfo } = useWidgetFunctionC
   () => suggestionDb.value.groups,
   () => typeDefaults.value,
   () => schemaCache.value,
+  () => staticAnswers.value,
 )
 
 // A file dropped on the graph (#489) matches the format options a node here has already loaded.

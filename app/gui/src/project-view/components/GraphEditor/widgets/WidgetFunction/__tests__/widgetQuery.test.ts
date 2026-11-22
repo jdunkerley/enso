@@ -36,3 +36,18 @@ test('the query is a method pointer to Widget_Query.resolve_call, evaluated in i
   expect(config.visualizationModule).toBe(WIDGET_QUERY_MODULE)
   expect(config.expression).toEqual(RESOLVE_CALL_POINTER)
 })
+
+test('search, type defaults and revision are appended only when set', () => {
+  expect(resolveCallArguments(target, ['on'], {}, false, {})).toHaveLength(6)
+  expect(
+    resolveCallArguments(target, ['on'], {}, false, { search: '', typeDefaults: {}, revision: '' }),
+  ).toHaveLength(6)
+  expect(
+    resolveCallArguments(target, ['on'], {}, false, { search: 'ab', revision: '3' }).slice(6),
+  ).toEqual(["'ab'", "'{}'", "'3'"])
+  expect(
+    resolveCallArguments(target, ['format'], {}, false, {
+      typeDefaults: { format: 'Standard.DuckDB.DuckDB_GeoFormat.DuckDB_GeoFormat' },
+    }).slice(6),
+  ).toEqual(["''", `'{"format":"Standard.DuckDB.DuckDB_GeoFormat.DuckDB_GeoFormat"}'`, "''"])
+})

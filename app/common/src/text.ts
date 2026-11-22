@@ -91,6 +91,7 @@ interface PlaceholderOverrides {
   readonly librariesNotLoaded: [libraries: string]
   readonly libraryNotInEdition: [library: string]
   readonly widgetQueryError: [message: string]
+  readonly widgetQueryUnavailable: [dependency: string]
   readonly libraryDownloadFailed: [library: string, version: string, reason: string]
   readonly libraryLocalMissing: [library: string]
   readonly libraryLoadingError: [library: string, version: string, reason: string]

@@ -30,6 +30,7 @@ const [provideCurrentProject, useCurrentProjectRaw] = createContextStore(
       widgetRegistry: computed(() => ref.value.widgetRegistry),
       typeDefaults: computed(() => ref.value.typeDefaults),
       schemaCache: computed(() => ref.value.schemaCache),
+      staticAnswers: computed(() => ref.value.staticAnswers),
     }
   },
 )

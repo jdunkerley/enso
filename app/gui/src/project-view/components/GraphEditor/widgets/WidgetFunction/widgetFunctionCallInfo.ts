@@ -12,8 +12,19 @@ import {
   pending,
   widgetQueryAnswerSchema,
   type FunctionCall,
+  type ResolverInfo,
+  type WidgetQueryAnswer,
+  type WidgetQueryNote,
 } from '$/providers/openedProjects/widgetRegistry/configuration'
+import type { StaticAnswerCache } from '$/providers/openedProjects/widgetRegistry/staticAnswerCache'
 import type { TypeDefaults } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
+import {
+  RESOLVER_TIME_BOX_MS,
+  isStaticAnswer,
+  namedDependencies,
+  queryUuids,
+  revisionStamp,
+} from '$/providers/openedProjects/widgetRegistry/widgetQueryPlan'
 import type { ToValue } from '$/utils/reactivity'
 import { Ast } from '@/util/ast'
 import {
@@ -26,10 +37,21 @@ import {
 import type { MethodPointer } from '@/util/methodPointer'
 import type { ProjectPath } from '@/util/projectPath'
 import type { Opt } from 'enso-common/src/utilities/data/opt'
-import { computed, toValue, watch, type DeepReadonly } from 'vue'
+import {
+  computed,
+  onScopeDispose,
+  ref,
+  shallowRef,
+  toRaw,
+  toValue,
+  watch,
+  type DeepReadonly,
+} from 'vue'
 import type { IdentifierOrOperatorIdentifier } from 'ydoc-shared/ast'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
+import { stableByValue } from './stableConfig'
 import { widgetQueryConfiguration } from './widgetQuery'
+import { useWidgetSearch, type SearchText } from './widgetSearch'
 
 /**
  * A composable gathering information about call for WidgetFunction basing on AST and
@@ -42,8 +64,11 @@ export function useWidgetFunctionCallInfo(
   project: ToValue<Pick<ProjectStore, 'useVisualizationData' | 'moduleProjectPath' | 'assetId'>>,
   projectNames: ToValue<ProjectNameStore>,
   groups: ToValue<DeepReadonly<GroupInfo[]>>,
-  typeDefaults?: ToValue<Pick<TypeDefaults, 'lookup'> | undefined>,
+  typeDefaults?: ToValue<
+    (Pick<TypeDefaults, 'lookup'> & Partial<Pick<TypeDefaults, 'resolverDefault'>>) | undefined
+  >,
   schemaCache?: ToValue<SchemaCache | undefined>,
+  staticAnswers?: ToValue<StaticAnswerCache | undefined>,
 ) {
   const methodCallInfo = computed(() => {
     const _project = toValue(project)
@@ -103,37 +128,6 @@ export function useWidgetFunctionCallInfo(
     return null
   })
 
-  const annotatedArguments = computed(() => {
-    const info = methodCallInfo.value
-    if (!info) return null
-    if (!entryIsAnnotatable(info.suggestion)) return null
-    return info.suggestion.annotations
-  })
-
-  const visualizationConfig = computed<Opt<NodeVisualizationConfiguration>>(() => {
-    const info = methodCallInfo.value
-    if (!info) return null
-    if (!entryIsAnnotatable(info.suggestion)) return null
-    const annotatedArgs = annotatedArguments.value
-    if (!annotatedArgs?.length) return null
-    const names = toValue(projectNames)
-    const pointer = info.methodCall.methodPointer
-    // No subject expression (an autoscoped constructor, a static call with no subject): the query
-    // hangs on the call itself, and annotations see the method's type, as before.
-    const subjectId = widgetQuerySubjectExpressionId.value
-    return widgetQueryConfiguration(
-      subjectId ?? toValue(input).value.externalId,
-      {
-        module: names.serializeProjectPathForBackend(pointer.module),
-        definedOnType: names.serializeProjectPathForBackend(pointer.definedOnType),
-        name: pointer.name,
-      },
-      annotatedArgs,
-      ArgumentApplication.collectArgumentNamesAndUuids(interpreted.value, info),
-      subjectId == null,
-    )
-  })
-
   const subjectTypeMatchesMethod = computed(() => {
     const funcType = methodCallInfo.value?.methodCall.methodPointer.definedOnType
     return (
@@ -158,15 +152,166 @@ export function useWidgetFunctionCallInfo(
     return undefined
   })
 
-  // TODO[ao]: This does not work with project change. Either useVisualizationData API must
-  //  change, or useCurrentRef should not return ref.
-  const visualizationData = toValue(project).useVisualizationData(visualizationConfig)
+  const callFrame = computed(() => toValue(input).value.externalId)
+
+  /**
+   * The arguments the query resolves: the annotated ones, then those without an annotation whose
+   * declared type's default is a resolver (sent in `type_defaults`, name to type). A union's
+   * member with a resolver default is not added: the union's composition owns it.
+   */
+  const queriedArguments = computed(() => {
+    const info = methodCallInfo.value
+    if (!info) return null
+    if (!entryIsAnnotatable(info.suggestion)) return null
+    const annotated = info.suggestion.annotations
+    const typeDefaultNames: Record<string, string> = {}
+    const defaults = toValue(typeDefaults)
+    if (defaults?.resolverDefault != null) {
+      for (const argument of info.suggestion.arguments) {
+        if (argument.name === 'self' || annotated.includes(argument.name)) continue
+        if (defaults.resolverDefault(argument.reprType, callFrame.value) != null)
+          typeDefaultNames[argument.name] = argument.reprType
+      }
+    }
+    const names = [...annotated, ...Object.keys(typeDefaultNames)]
+    return names.length > 0 ? { names, typeDefaults: typeDefaultNames } : null
+  })
 
   const queryMethod = computed(() => {
     const pointer = methodCallInfo.value?.methodCall.methodPointer
     if (!pointer) return ''
     return `${toValue(projectNames).serializeProjectPathForBackend(pointer.definedOnType)}.${pointer.name}`
   })
+
+  /** What identifies the query apart from its dependencies: the subject, method and arguments. */
+  const queryBase = computed(() => {
+    const info = methodCallInfo.value
+    const queried = queriedArguments.value
+    if (!info || !queried) return null
+    const names = toValue(projectNames)
+    const pointer = info.methodCall.methodPointer
+    // No subject expression (an autoscoped constructor, a static call with no subject): the query
+    // hangs on the call itself, and annotations see the method's type, as before.
+    const subjectId = widgetQuerySubjectExpressionId.value
+    const base = {
+      expressionId: subjectId ?? toValue(input).value.externalId,
+      target: {
+        module: names.serializeProjectPathForBackend(pointer.module),
+        definedOnType: names.serializeProjectPathForBackend(pointer.definedOnType),
+        name: pointer.name,
+      },
+      argumentNames: queried.names,
+      typeDefaults: queried.typeDefaults,
+      subjectIsType: subjectId == null,
+    }
+    return { ...base, key: JSON.stringify(base) }
+  })
+
+  const allUuids = computed<Record<string, string>>(() => {
+    const info = methodCallInfo.value
+    return info ? ArgumentApplication.collectArgumentNamesAndUuids(interpreted.value, info) : {}
+  })
+
+  // The static answers of the project: a hit detaches the node's query.
+  const staticKey = computed(() => {
+    const cache = toValue(staticAnswers)
+    const base = queryBase.value
+    if (!cache || !base) return undefined
+    return cache.key(queryMethod.value, base.argumentNames)
+  })
+  const cachedAnswer = computed(() => {
+    const key = staticKey.value
+    return key == null ? undefined : toValue(staticAnswers)?.get(key)
+  })
+
+  /**
+   * The last answer accepted for this call, the query that asked it, and the plan it is current
+   * for: while the plan is equal, nothing is asked again.
+   */
+  const accepted = shallowRef<{
+    answer: WidgetQueryAnswer
+    baseKey: string
+    config: NodeVisualizationConfiguration
+    planKey: string
+  }>()
+  const acceptedAnswer = computed(() =>
+    accepted.value?.baseKey === queryBase.value?.key ? accepted.value : undefined,
+  )
+
+  /** The resolvers of the accepted answer; `undefined` before any (so every id is sent). */
+  const resolvers = computed(() => resolversOf(acceptedAnswer.value?.answer))
+  const sentUuids = computed(() => queryUuids(allUuids.value, resolvers.value))
+  const revisionIds = new WeakMap<object, number>()
+  // A dependency's value is its expression's payload: the registry replaces the payload object on
+  // every update of the expression (and keeps the info object).
+  function revisionFor(known: ReadonlyMap<string, ResolverInfo> | undefined) {
+    if (!known) return ''
+    const db = toValue(graphDb)
+    const values = namedDependencies(known).map((name) => {
+      const id = allUuids.value[name] as ExternalId | undefined
+      const payload = id && db.getExpressionInfo(id)?.payload
+      return payload && toRaw(payload)
+    })
+    return revisionStamp(values, revisionIds)
+  }
+  const revision = computed(() => revisionFor(resolvers.value))
+  function planKeyFor(known: ReadonlyMap<string, ResolverInfo> | undefined) {
+    return JSON.stringify([
+      queryBase.value?.key,
+      queryUuids(allUuids.value, known),
+      revisionFor(known),
+    ])
+  }
+  const planKey = computed(() => planKeyFor(resolvers.value))
+
+  /** The query of the call (or, with `argument`, of that argument only). */
+  function queryConfiguration(
+    uuids: Record<string, string>,
+    extras: { search?: string; revision?: string; argument?: string },
+  ): Opt<NodeVisualizationConfiguration> {
+    const base = queryBase.value
+    if (!base) return null
+    const argumentNames = extras.argument != null ? [extras.argument] : base.argumentNames
+    const typeDefaultNames =
+      extras.argument == null ?
+        base.typeDefaults
+      : Object.fromEntries(
+          Object.entries(base.typeDefaults).filter(([name]) => name === extras.argument),
+        )
+    return widgetQueryConfiguration(
+      base.expressionId,
+      base.target,
+      argumentNames,
+      uuids,
+      base.subjectIsType,
+      { search: extras.search, typeDefaults: typeDefaultNames, revision: extras.revision },
+    )
+  }
+
+  // Note [When A Widget Query Re-Runs] in `widgetQueryPlan.ts`.
+  const sentRevisions = new WeakMap<NodeVisualizationConfiguration, string>()
+  const visualizationConfig = stableByValue(() => {
+    if (cachedAnswer.value) return null
+    const current = acceptedAnswer.value
+    if (current && current.planKey === planKey.value) return current.config
+    const config = queryConfiguration(sentUuids.value, { revision: revision.value })
+    if (config) sentRevisions.set(config, revision.value)
+    return config
+  })
+
+  // TODO[ao]: This does not work with project change. Either useVisualizationData API must
+  //  change, or useCurrentRef should not return ref.
+  const visualizationData = toValue(project).useVisualizationData(visualizationConfig)
+
+  // The data present when a query is sent answers an older one, whatever its revision.
+  let dataBeforeQuery: unknown = undefined
+  watch(
+    visualizationConfig,
+    () => {
+      dataBeforeQuery = visualizationData.value
+    },
+    { flush: 'sync', immediate: true },
+  )
 
   const parsedAnswer = computed(() => {
     const data = visualizationData.value
@@ -176,9 +321,29 @@ export function useWidgetFunctionCallInfo(
     const parsed = widgetQueryAnswerSchema.safeParse(data.value)
     const parseMs = performance.now() - startedAt
     return parsed.success ?
-        { kind: 'answer' as const, answer: parsed.data, startedAt, parseMs }
+        { kind: 'answer' as const, answer: parsed.data, startedAt, parseMs, data }
       : { kind: 'mismatch' as const, issues: parsed.error.issues }
   })
+
+  // An answer is accepted when it is new since its query was sent and echoes the query's revision
+  // (latest wins); a static one is kept for every call of the method. Synchronously, so that the
+  // configuration below reads it at once.
+  watch(
+    parsedAnswer,
+    (parsed) => {
+      const config = visualizationConfig.value
+      const base = queryBase.value
+      if (parsed?.kind !== 'answer' || !config || !base) return
+      if (parsed.data === dataBeforeQuery) return
+      if ((parsed.answer.revision ?? '') !== (sentRevisions.get(config) ?? '')) return
+      const planKey = planKeyFor(resolversOf(parsed.answer))
+      accepted.value = { answer: parsed.answer, baseKey: base.key, config, planKey }
+      stopTimeBox()
+      if (isStaticAnswer(parsed.answer) && staticKey.value != null)
+        toValue(staticAnswers)?.set(staticKey.value, parsed.answer, base.target.module)
+    },
+    { flush: 'sync' },
+  )
 
   // Side effects of an answer, outside the computed: the reports, and the timing once the node has
   // rendered it (`flush: 'post'` runs after the DOM update). The reporters deduplicate mismatches
@@ -201,21 +366,96 @@ export function useWidgetFunctionCallInfo(
     { flush: 'post' },
   )
 
-  const widgetConfiguration = computed(() => {
-    const parsed = parsedAnswer.value
-    if (parsed?.kind === 'answer')
-      return functionCallFromAnswer(parsed.answer, inheritedConfig.value, toValue(schemaCache))
-    const parameters: FunctionCall['parameters'] = new Map(inheritedConfig.value?.parameters ?? [])
-    annotatedArguments.value?.forEach((name) => {
-      if (parameters.get(name) == null) parameters.set(name, pending())
+  // The time-box: a query not answered in `RESOLVER_TIME_BOX_MS` shows its arguments' fallbacks
+  // with a loading marker until the answer comes; the query is not cancelled.
+  const timedOut = ref(false)
+  let timeBox: ReturnType<typeof setTimeout> | undefined
+  function stopTimeBox() {
+    if (timeBox != null) clearTimeout(timeBox)
+    timeBox = undefined
+    timedOut.value = false
+  }
+  watch(
+    visualizationConfig,
+    (config) => {
+      stopTimeBox()
+      if (config == null || config === acceptedAnswer.value?.config) return
+      timeBox = setTimeout(() => {
+        timeBox = undefined
+        timedOut.value = true
+      }, RESOLVER_TIME_BOX_MS)
+    },
+    { flush: 'sync', immediate: true },
+  )
+  onScopeDispose(stopTimeBox)
+  /** Whether a query is waiting for its answer past the time-box. */
+  const awaitingPastTimeBox = computed(
+    () =>
+      timedOut.value &&
+      visualizationConfig.value != null &&
+      visualizationConfig.value !== acceptedAnswer.value?.config,
+  )
+
+  // Search as you type, in a searchable argument (one dropdown is edited at a time).
+  const searchText = shallowRef<SearchText>()
+  const search = useWidgetSearch(
+    project,
+    (argument, text) => queryConfiguration(sentUuids.value, { search: text, argument }),
+    searchText,
+  )
+  function onSearch(argument: string, text: string) {
+    const current = searchText.value
+    if (current?.argument === argument && current.text === text) return
+    // Another argument's dropdown closing does not end this one's search.
+    if (!text && current != null && current.argument !== argument) return
+    searchText.value = text ? { argument, text } : undefined
+  }
+
+  const widgetConfiguration = computed((): FunctionCall => {
+    const answer = cachedAnswer.value ?? acceptedAnswer.value?.answer
+    const loading = awaitingPastTimeBox.value
+    const inherited = inheritedConfig.value
+    if (answer) {
+      const call = functionCallFromAnswer(answer, inherited, toValue(schemaCache))
+      const searched = search.answer.value
+      if (
+        searched &&
+        call.resolvers?.get(searched.argument)?.searchable &&
+        !inherited?.parameters.has(searched.argument)
+      ) {
+        const widget = functionCallFromAnswer(
+          searched.answer,
+          undefined,
+          toValue(schemaCache),
+        ).parameters.get(searched.argument)
+        if (widget != null) call.parameters.set(searched.argument, widget)
+      }
+      if (loading && call.resolvers) {
+        const notes = new Map(call.notes)
+        for (const name of call.resolvers.keys()) {
+          if (call.errors?.has(name) || inherited?.parameters.has(name)) continue
+          call.parameters.delete(name)
+          notes.set(name, { kind: 'loading' })
+        }
+        call.notes = notes
+      }
+      if ([...(call.resolvers?.values() ?? [])].some((resolver) => resolver.searchable))
+        call.onSearch = onSearch
+      return call
+    }
+    const parameters: FunctionCall['parameters'] = new Map(inherited?.parameters ?? [])
+    const notes = new Map<string, WidgetQueryNote>()
+    queryBase.value?.argumentNames.forEach((name) => {
+      if (parameters.get(name) != null) return
+      if (loading) notes.set(name, { kind: 'loading' })
+      else parameters.set(name, pending())
     })
     return {
       kind: 'FunctionCall',
       parameters,
-    } satisfies FunctionCall
+      ...(notes.size > 0 ? { notes } : {}),
+    }
   })
-
-  const callFrame = computed(() => toValue(input).value.externalId)
 
   const application = computed(() => {
     const call = interpreted.value
@@ -258,6 +498,16 @@ export function useWidgetFunctionCallInfo(
     subject,
     subjectInfo,
   }
+}
+
+/** The arguments of `answer` whose widget a resolver computes; `undefined` without an answer. */
+function resolversOf(answer: WidgetQueryAnswer | undefined) {
+  if (!answer) return undefined
+  return new Map(
+    answer.arguments.flatMap(([name, result]) =>
+      result.resolver ? [[name, result.resolver] as const] : [],
+    ),
+  )
 }
 
 /**
