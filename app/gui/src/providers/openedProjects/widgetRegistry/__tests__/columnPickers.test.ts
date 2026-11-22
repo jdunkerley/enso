@@ -204,3 +204,32 @@ test('the least recently used schema is dropped', () => {
   cache.get('s2', 'p', compute)
   expect(computed).toBe(4)
 })
+
+test('a Union expands a picker among its kinds and keeps Nothing', () => {
+  const union = {
+    kind: 'Union',
+    kinds: [
+      { label: 'Name', config: { ...name, from: 'self' } },
+      { label: 'Nothing', config: null },
+    ],
+  } as const
+  const result = expandColumnPickers(union as never, { self: cols })
+  expect(result).toEqual({
+    kind: 'Union',
+    kinds: [
+      { label: 'Name', config: expandPicker(name, cols) },
+      { label: 'Nothing', config: null },
+    ],
+  })
+})
+
+test('a Union without pickers is returned identical', () => {
+  const union = {
+    kind: 'Union',
+    kinds: [
+      { label: 'Text', config: { kind: 'Text_Input' } },
+      { label: 'Nothing', config: null },
+    ],
+  } as const
+  expect(expandColumnPickers(union as never, { self: cols })).toBe(union)
+})

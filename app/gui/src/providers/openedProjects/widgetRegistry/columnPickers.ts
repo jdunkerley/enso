@@ -260,6 +260,13 @@ function expandWith(
       const itemEditor = expandNested(config.item_editor)
       return itemEditor === config.item_editor ? config : { ...config, item_editor: itemEditor }
     }
+    case 'Union': {
+      const kinds = mapPreserving(config.kinds, (kind) => {
+        const expanded = kind.config && expandNested(kind.config)
+        return expanded === kind.config ? kind : { ...kind, config: expanded }
+      })
+      return kinds === config.kinds ? config : { ...config, kinds }
+    }
     default:
       return config
   }
