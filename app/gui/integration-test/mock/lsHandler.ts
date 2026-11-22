@@ -600,6 +600,7 @@ export function restoreMockWidgetConfigurations() {
 function resetTypeDefaults() {
   mockTypeDefaults = new Map(Object.entries(initialMockTypeDefaults))
   typeDefaultQueries.length = 0
+  resetResolverMocks()
 }
 
 /**
@@ -618,6 +619,7 @@ export function clearPreprocessorOverrides() {
   preprocessorOverrides.clear()
   lastWidgetQueries.clear()
   typeDefaultQueries.length = 0
+  resetResolverMocks()
 }
 
 /** The execution contexts created on the open pages, each with the channel that notifies it. */
@@ -840,6 +842,103 @@ function widgetQueryKey(args: readonly string[]): string | null {
   return `.${name}`
 }
 
+// --- Resolvers (widgets PR 6b): answers that depend on what the query sends ---
+
+/** What a node's `resolve_call` query sent, after the subject. */
+export interface MockWidgetQuery {
+  argumentNames: string[]
+  uuids: Record<string, string>
+  search: string
+  typeDefaults: Record<string, string>
+  revision: string
+}
+
+interface ResolverMock {
+  answer: (query: MockWidgetQuery) => unknown
+  delayMs: number
+}
+
+/** Answers of widget queries computed from the query, by the called method's `.name`. */
+const resolverMocks = new Map<string, ResolverMock>()
+/** Every widget query the GUI sent (a new request in a slot), in order, since the last reset. */
+const widgetQueryLog: { method: string; query: MockWidgetQuery }[] = []
+/** The request each slot was last seen with, so a query is logged and answered once. */
+const seenWidgetRequests = new WeakMap<YMap<unknown>, unknown>()
+
+/**
+ * Answer the widget queries of `.name` with `answer(query)`, `delayMs` after each is sent. The
+ * answer echoes the query's `search` and `revision`, as the engine does.
+ */
+export function setMockResolverAnswer(
+  method: string,
+  answer: (query: MockWidgetQuery) => unknown,
+  delayMs = 0,
+) {
+  resolverMocks.set(method, { answer, delayMs })
+}
+
+/** Test entry point: how many widget queries of `.name` the GUI sent. */
+export function widgetQueryCount(method: string): number {
+  return widgetQueryLog.filter((entry) => entry.method === method).length
+}
+
+/** Test entry point: the widget queries of `.name` the GUI sent, in order. */
+export function widgetQueriesOf(method: string): MockWidgetQuery[] {
+  return widgetQueryLog.filter((entry) => entry.method === method).map((entry) => entry.query)
+}
+
+function resetResolverMocks() {
+  resolverMocks.clear()
+  widgetQueryLog.length = 0
+}
+
+/** `resolve_call`'s arguments after the subject, read back. */
+function parseWidgetQuery(args: readonly string[]): MockWidgetQuery {
+  const vector = args[3] != null ? Ast.parseExpression(args[3]) : undefined
+  const argumentNames =
+    vector instanceof Ast.Vector ?
+      [...vector.values()].flatMap((value) => textOf(value.code()) ?? [])
+    : []
+  const json = (code: string | undefined) => JSON.parse(textOf(code) ?? '{}')
+  return {
+    argumentNames,
+    uuids: json(args[4]),
+    search: textOf(args[6]) ?? '',
+    typeDefaults: json(args[7]),
+    revision: textOf(args[8]) ?? '',
+  }
+}
+
+/**
+ * Log a new widget query in `slot`, and answer it if its method has a resolver mock. Returns
+ * whether the mock took the slot.
+ */
+function maybeAnswerResolverQuery(
+  slot: YMap<unknown>,
+  request: VisRequestPreprocessor,
+  key: string,
+): boolean {
+  if (seenWidgetRequests.get(slot) === request) return resolverMocks.has(key)
+  seenWidgetRequests.set(slot, request)
+  const query = parseWidgetQuery(request.positionalArgumentsExpressions ?? [])
+  widgetQueryLog.push({ method: key, query })
+  const mock = resolverMocks.get(key)
+  if (!mock) return false
+  const answer = {
+    ...(mock.answer(query) as object),
+    ...(query.search ? { search: query.search } : {}),
+    ...(query.revision ? { revision: query.revision } : {}),
+  }
+  const respond = () => {
+    // A newer request replaced this one meanwhile: the engine would answer that one instead.
+    if (slot.get(VIS_SLOT_FIELDS.request) !== request) return
+    writeSlotResponse(slot, encodeJSON(answer))
+  }
+  if (mock.delayMs > 0) setTimeout(respond, mock.delayMs)
+  else respond()
+  return true
+}
+
 /**
  * Extract the preprocessor identifier from a slot's immutable request, so the mock can route
  * responses by preprocessor name: `Module.method` for a visualization (a method pointer, or an
@@ -992,6 +1091,13 @@ function maybeRespondToSlot(slot: YMap<unknown>): void {
   ) {
     return
   }
+  if (
+    isWidgetQuery(request) &&
+    typeof request.expression === 'object' &&
+    !('inFrame' in request.expression) &&
+    maybeAnswerResolverQuery(slot, request, key)
+  )
+    return
   const bytes = responseBytesFor(key, slotPositionalArgs(request))
   if (bytes) writeSlotResponse(slot, isWidgetQuery(request) ? asWidgetAnswer(bytes) : bytes)
 }
