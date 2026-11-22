@@ -235,7 +235,7 @@ type Connection
           is raised.
         - If provided with a `Table_Name` or a text short-hand and the table is
           not found, a `Table_Not_Found` error is raised.
-    @query make_table_name_selector
+    @query (make_table_name_selector add_custom=True)
     query : SQL_Query -> Text -> Table & DB_Table ! Table_Not_Found | SQL_Error
     query self query alias:Text="" =
         used_query = case query of
@@ -262,7 +262,7 @@ type Connection
        it is provided with a DML query. Usually it is preferred to use
        `execute_update` for DML queries, or if they are supposed to return
        results, the `read` should be wrapped in an execution context check.
-    @query make_table_name_selector
+    @query (make_table_name_selector add_custom=True)
     read : SQL_Query -> Rows_To_Read -> Table ! Table_Not_Found
     read self query (limit : Rows_To_Read = ..First_With_Warning 1000) =
         self.query query . read max_rows=limit
@@ -571,7 +571,7 @@ type Connection
        ## Arguments
        - `table_name`: the name of the table to get the primary key for.
        - `schema_name`: optionally, the schema name where the table is located.
-    @table_name make_table_name_selector add_custom=False
+    @table_name (make_table_name_selector add_custom=False)
     fetch_primary_key : Text -> Text -> Vector Text ! Nothing
     fetch_primary_key self table_name:Text schema_name:Text="" =
         self.jdbc_connection.with_metadata metadata->
@@ -631,9 +631,13 @@ make_schema_selector connection include_any:Boolean=False =
 ## ---
    private: true
    ---
-make_table_name_selector : Connection -> Boolean -> Widget
-make_table_name_selector connection add_custom:Boolean=True =
-    tables_to_display = connection.tables.at "Name" . to_vector
+   A searchable picker of the connection's table names: a resolver of the
+   connection and `search`. With a search text, only the tables whose name
+   contains it (matched by the database, as `tables`'s `name_like` is); with
+   none, every table. `add_custom` is configuration, pre-applied in the
+   annotation: whether the `<Table_Name>` and `<Raw_SQL>` entries end the list.
+make_table_name_selector connection (add_custom : Boolean = True) (search : Text = "") -> Widget =
+    tables_to_display = connection.tables name_like=(_like_pattern search) . at "Name" . to_vector
     table_name_values = tables_to_display.map t-> Option t t.pretty
     values = table_name_values + (if add_custom then [Option '<Table_Name>' '..Table_Name ""', Option '<Raw_SQL>' '..Raw_SQL ""'] else [])
     Single_Choice values=values
@@ -641,16 +645,31 @@ make_table_name_selector connection add_custom:Boolean=True =
 ## ---
    private: true
    ---
-make_table_name_with_schema_selector connection schema_black_list=[] =
+   A searchable picker of the table names of every schema but those in
+   `schema_black_list` (names in the connection's own schema unqualified): a
+   resolver of the connection and `search`, as `make_table_name_selector` is.
+   `schema_black_list` and `add_custom` are configuration, pre-applied in the
+   annotation.
+make_table_name_with_schema_selector connection (schema_black_list : Vector = []) (add_custom : Boolean = True) (search : Text = "") -> Widget =
     schema = connection.schema
     schema_text sch = if sch == schema then "" else sch+"."
-    tables = connection.tables schema="*" . filter "Schema" (..Is_In schema_black_list ..Remove)
+    tables = connection.tables name_like=(_like_pattern search) schema="*" . filter "Schema" (..Is_In schema_black_list ..Remove)
     table_name_values = tables.rows.map r->
         name = r.at "Name"
         sch = r.at "Schema"
         Option ((schema_text sch) + name) "(..Table_Name "+name.pretty+(if sch == schema then "" else " "+sch.pretty)+")"
-    values = table_name_values + [Option '<Table_Name>' '..Table_Name ""', Option '<Raw_SQL>' '..Raw_SQL ""']
+    values = table_name_values + (if add_custom then [Option '<Table_Name>' '..Table_Name ""', Option '<Raw_SQL>' '..Raw_SQL ""'] else [])
     Single_Choice values=values
+
+## ---
+   private: true
+   ---
+   The `name_like` pattern of a search: the text with `\`, `%` and `_`
+   escaped by `\`, between `%`s; `Nothing` (every table) for no text.
+private _like_pattern (search : Text) -> Text | Nothing =
+    if search.is_empty then Nothing else
+        escaped = search.replace '\\' '\\\\' . replace "%" '\\%' . replace "_" '\\_'
+        "%" + escaped + "%"
 
 ## ---
    private: true
