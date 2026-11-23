@@ -22,6 +22,7 @@ import {
   type EffectScope,
   type Ref,
 } from 'vue'
+import type { SuggestionDatabaseUpdates } from 'ydoc-shared/languageServerTypes'
 import { useBackends } from '../backends'
 import { engineLoggingOptions } from '../engineLogSettings'
 import { useLocalVersioning } from '../localVersioning'
@@ -34,6 +35,7 @@ import { createProjectNameStore, type ProjectNameStore } from './projectNames'
 import { createSuggestionDbStore, type SuggestionDbStore } from './suggestionDatabase'
 import { WidgetRegistry } from './widgetRegistry'
 import { SchemaCache } from './widgetRegistry/columnPickers'
+import { StaticAnswerCache, modulesOfSuggestionUpdates } from './widgetRegistry/staticAnswerCache'
 import {
   TypeDefaults,
   chooseComputedFrame,
@@ -77,6 +79,7 @@ export interface Initialized {
   widgetRegistry: WidgetRegistry
   typeDefaults: TypeDefaults
   schemaCache: SchemaCache
+  staticAnswers: StaticAnswerCache
 }
 
 /**
@@ -228,6 +231,20 @@ export function useProjectStates() {
       )
       onScopeDispose(() => typeDefaults.dispose())
       const schemaCache = new SchemaCache()
+      // Static widget answers go stale with their method's module: when it is recompiled, or its
+      // library reloads, the engine sends the module's suggestions again.
+      const staticAnswers = new StaticAnswerCache()
+      const dropStaticAnswers = ({ updates }: SuggestionDatabaseUpdates) =>
+        staticAnswers.dropModules(
+          modulesOfSuggestionUpdates(updates, (id) => {
+            const entry = suggestionDb.entries.get(id)
+            return entry && projectNames.serializeProjectPathForBackend(entry.definedIn)
+          }),
+        )
+      store.lsRpcConnection.on('search/suggestionsDatabaseUpdates', dropStaticAnswers)
+      onScopeDispose(() =>
+        store.lsRpcConnection.off('search/suggestionsDatabaseUpdates', dropStaticAnswers),
+      )
       const projectId = project.info.id
       localVersioning.watchProject(projectId, () => store.flushModules())
       onScopeDispose(() => localVersioning.unwatchProject(projectId))
@@ -248,6 +265,7 @@ export function useProjectStates() {
           widgetRegistry,
           typeDefaults,
           schemaCache,
+          staticAnswers,
           scope,
         } satisfies Initialized),
       )

@@ -387,3 +387,27 @@ test('convertsBetween reads the suggestion database `Target.from` entries', () =
   expect(convertsBetween(db, TEXT, FILE)).toBe(true)
   expect(convertsBetween(db, FILE, TEXT)).toBe(false)
 })
+
+test('a type whose default is a resolver has no static default, and says what it reads', async () => {
+  const report = vi.mocked(engineLogAppend.reportWidgetSchemaMismatch)
+  const resolver = { dependencies: ['self'], searchable: false }
+  const query = vi.fn(async () => Ok({ widget: null, resolver }))
+  const defaults = make(() => true, query)
+  expect(defaults.resolverDefault(DATE, frameA)).toBeUndefined() // pending
+  await flushPromises()
+  expect(defaults.lookup(DATE, frameA)).toBeUndefined()
+  expect(defaults.resolverDefault(DATE, frameA)).toEqual(resolver)
+  expect(defaults.resolverDefault(`${DATE} | ${TEXT}`, frameA)).toBeUndefined()
+  expect(query).toHaveBeenCalledTimes(1)
+  expect(report).not.toHaveBeenCalled()
+})
+
+test('a static default is no resolver default', async () => {
+  const defaults = make(
+    () => true,
+    async () => Ok({ widget: { constructor: 'Date_Input' } }),
+  )
+  defaults.lookup(DATE, frameA)
+  await flushPromises()
+  expect(defaults.resolverDefault(DATE, frameA)).toBeUndefined()
+})

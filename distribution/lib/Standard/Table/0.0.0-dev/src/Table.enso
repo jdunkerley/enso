@@ -4025,7 +4025,6 @@ type Table
           Returns a Table | Input | Generated Row | |-------|---------------| |
           Hello | 0             | | Hello | 1             | | World | 0
           | | World | 1             |
-    @over (Widget.from Generate_Rows_Range)
     generate_rows self over:Generate_Rows_Range=(Missing_Argument.throw "over") as:Text="" on_problems:Problem_Behavior=..Report_Warning = _profile_time_execution "Table.generate_rows" <|
         self.implementation.generate_rows self.underlying over as on_problems
 

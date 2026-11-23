@@ -11,7 +11,12 @@ import type { Result } from 'enso-common/src/utilities/data/result'
 import { reactive, toRaw } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { z } from 'zod'
-import { type WidgetConfiguration, widgetConfigurationSchema } from './configuration'
+import {
+  type ResolverInfo,
+  type WidgetConfiguration,
+  resolverInfoSchema,
+  widgetConfigurationSchema,
+} from './configuration'
 import { type Converts, NOTHING_TYPE, composeUnion, unionMembers } from './unionKinds'
 
 /** The type of widgets: a type has a default when `Widget.from` converts it. */
@@ -21,9 +26,16 @@ export const WIDGET_TYPE = 'Standard.Base.Metadata.Widget'
 export const RESOLVE_TYPE_EXPRESSION = (typeName: string) =>
   `${MODULE_CALL} 'Standard.Base.Metadata.Widget_Query' 'resolve_type' [] '${typeName}'`
 
-/** The answer of `Widget_Query.resolve_type` (exported for the tests). */
+/**
+ * The answer of `Widget_Query.resolve_type` (exported for the tests). A type whose default is a
+ * resolver has no static widget (`widget: null`) and says what the resolver reads; such a default
+ * is computed per call, by sending the argument in `resolve_call`'s `type_defaults`.
+ */
 export const answerSchema = z.union([
-  z.object({ widget: widgetConfigurationSchema.nullable() }),
+  z.object({
+    widget: widgetConfigurationSchema.nullable(),
+    resolver: resolverInfoSchema.optional(),
+  }),
   z.object({ error: z.object({ step: z.string(), message: z.string() }) }),
 ])
 
@@ -62,6 +74,7 @@ type CacheEntry =
   | { state: 'pending' }
   | { state: 'retry' }
   | { state: 'done'; config: WidgetConfiguration | undefined }
+  | { state: 'resolver'; resolver: ResolverInfo }
 
 /** Whether `Widget.from` converts the type `typeName`. Keys are built as `conversionSources` does. */
 export function hasWidgetConversion(db: SuggestionDb, typeName: string): boolean {
@@ -172,16 +185,38 @@ export class TypeDefaults {
     return composed
   }
 
+  /**
+   * The resolver of a declared type's default, when its default is one (it has then no static
+   * widget, and {@link lookup} returns `undefined`). Only a single type: a union whose member's
+   * default is a resolver offers that kind without a widget. Reactive, and may start the query.
+   */
+  resolverDefault(reprType: string | undefined, frame: ExternalId): ResolverInfo | undefined {
+    if (reprType == null) return undefined
+    const members = unionMembers(reprType)
+    if (members.length !== 1 || members[0] === NOTHING_TYPE) return undefined
+    const entry = this.entry(members[0]!, frame)
+    return entry?.state === 'resolver' ? entry.resolver : undefined
+  }
+
   private lookupType(type: string, frame: ExternalId): WidgetConfiguration | undefined | 'pending' {
+    const entry = this.entry(type, frame)
+    if (entry == null) return undefined
+    if (entry.state === 'done') return entry.config
+    return entry.state === 'resolver' ? undefined : 'pending'
+  }
+
+  /** The cache entry of a type with a `Widget.from` conversion, asking for it when not known. */
+  private entry(type: string, frame: ExternalId): CacheEntry | undefined {
     if (!this.hasDefault(type)) return undefined
     const entry = this.cache.get(type)
     if (entry == null) {
       // Not through the proxy: the caller is still reading, and `done` notifies it.
-      toRaw(this.cache).set(type, { state: 'pending' })
+      const pendingEntry: CacheEntry = { state: 'pending' }
+      toRaw(this.cache).set(type, pendingEntry)
       void this.ask(type, frame)
-      return 'pending'
+      return pendingEntry
     }
-    return entry.state === 'done' ? entry.config : 'pending'
+    return entry
   }
 
   /** Stop the pending retries. */
@@ -245,6 +280,10 @@ export class TypeDefaults {
         parsed.error.issues,
       )
       this.cache.set(type, { state: 'done', config: undefined })
+      return
+    }
+    if ('widget' in parsed.data && parsed.data.resolver != null) {
+      this.cache.set(type, { state: 'resolver', resolver: parsed.data.resolver })
       return
     }
     // An `error` answer was already logged by the engine.

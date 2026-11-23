@@ -55,7 +55,7 @@ class ArgumentFactory {
       insertAsNamed,
       this.display?.get(info.name),
     )
-    argument.queryError = this.queryError(info.name)
+    this.addQueryState(argument, info.name)
     return argument
   }
 
@@ -72,12 +72,18 @@ class ArgumentFactory {
       info,
       ast,
     )
-    argument.queryError = info && this.queryError(info.name)
+    if (info) this.addQueryState(argument, info.name)
     return argument
   }
 
-  private queryError(name: string) {
-    return this.widgetCfg?.errors?.get(name)
+  /** What the widget query says of the argument besides its widget: an error, a note, search. */
+  private addQueryState(argument: Argument, name: string) {
+    const cfg = this.widgetCfg
+    argument.queryError = cfg?.errors?.get(name)
+    argument.queryNote = cfg?.notes?.get(name)
+    const onSearch = cfg?.onSearch
+    if (onSearch && cfg.resolvers?.get(name)?.searchable)
+      argument.onSearch = (text: string) => onSearch(name, text)
   }
 
   /** The annotation's (or inherited) widget, else the default widget of the argument's type. */
@@ -90,6 +96,10 @@ type WidgetInputValue = Ast.Expression | Ast.Token | string | undefined
 abstract class Argument {
   /** Why the engine has no widget for this argument, if its widget query failed. */
   queryError: widgetCfg.WidgetQueryError | undefined = undefined
+  /** Why the argument shows its fallback rather than its widget, if it does. */
+  queryNote: widgetCfg.WidgetQueryNote | undefined = undefined
+  /** Set on a searchable argument: called with the text typed in its dropdown. */
+  onSearch: ((text: string) => void) | undefined = undefined
 
   protected constructor(
     public callId: AstId,
@@ -120,6 +130,8 @@ abstract class Argument {
       dynamicConfig: this.dynamicConfig,
       // Only when it failed: the widget registry matches the key's presence.
       ...(this.queryError ? { [WidgetQueryErrorKey]: this.queryError } : {}),
+      ...(this.queryNote ? { [WidgetQueryNoteKey]: this.queryNote } : {}),
+      ...(this.onSearch ? { [WidgetSearchKey]: this.onSearch } : {}),
     }
   }
 }
@@ -769,10 +781,22 @@ export const ArgumentApplicationKey: unique symbol = Symbol.for('WidgetInput:Arg
 export const ArgumentInfoKey: unique symbol = Symbol.for('WidgetInput:ArgumentInfo')
 /** Set on an argument whose widget query failed: `WidgetQueryError.vue` shows it. */
 export const WidgetQueryErrorKey: unique symbol = Symbol.for('WidgetInput:WidgetQueryError')
+/**
+ * Set on an argument that shows its fallback because its resolver's input is an error or its
+ * resolver is slow: `WidgetQueryNote.vue` shows it.
+ */
+export const WidgetQueryNoteKey: unique symbol = Symbol.for('WidgetInput:WidgetQueryNote')
+/**
+ * Set on a searchable argument: `WidgetSelection` calls it with the text typed in the dropdown,
+ * and with `''` when the dropdown opens or closes.
+ */
+export const WidgetSearchKey: unique symbol = Symbol.for('WidgetInput:WidgetSearch')
 declare module '$/providers/openedProjects/widgetRegistry' {
   export interface WidgetInput {
     [ArgumentApplicationKey]?: ArgumentApplication
     [WidgetQueryErrorKey]?: widgetCfg.WidgetQueryError
+    [WidgetQueryNoteKey]?: widgetCfg.WidgetQueryNote
+    [WidgetSearchKey]?: (text: string) => void
     [ArgumentInfoKey]?: {
       appKind: ApplicationKind
       info: SuggestionEntryArgument | undefined

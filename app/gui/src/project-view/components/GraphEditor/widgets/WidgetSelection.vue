@@ -37,7 +37,7 @@ import { useTopLevelArgument } from '@/providers/topLevelArgument'
 import { injectWidgetTree } from '@/providers/widgetTree'
 import { Ast } from '@/util/ast'
 import { targetIsOutside } from '@/util/autoBlur'
-import { ArgumentInfoKey } from '@/util/callTree'
+import { ArgumentInfoKey, WidgetSearchKey } from '@/util/callTree'
 import { computed, ref, shallowRef, toRef, toValue, useTemplateRef, type VNode } from 'vue'
 
 const props = defineProps(widgetProps(widgetDefinition))
@@ -71,24 +71,46 @@ const { floatingStyles: activityStyles } = activityDropdownStyles(
 )
 
 type ExpressionFilter = (tag: ExpressionTag) => boolean
-function makeExpressionFilter(pattern: Ast.Ast | string | undefined): ExpressionFilter | undefined {
+/**
+ * The local filter of the typed text: options starting with it, or, in a searchable argument
+ * (whose resolver matches anywhere in a name), containing it.
+ */
+function makeExpressionFilter(
+  pattern: Ast.Ast | string | undefined,
+  contains: boolean,
+): ExpressionFilter | undefined {
   if (!pattern) return undefined
+  const matches = (value: string, text: string) =>
+    contains ? value.includes(text) : value.startsWith(text)
   const editedAst = typeof pattern === 'string' ? Ast.parseExpression(pattern) : pattern
   if (editedAst instanceof Ast.TextLiteral) {
     const text = editedAst.rawTextContent
     if (!text) return undefined
     return (tag: ExpressionTag) =>
       (tag.expressionAst instanceof Ast.TextLiteral &&
-        tag.expressionAst.rawTextContent.startsWith(text)) ||
-      (tag.explicitLabel != null && tag.explicitLabel.startsWith(text))
+        matches(tag.expressionAst.rawTextContent, text)) ||
+      (tag.explicitLabel != null && matches(tag.explicitLabel, text))
   }
   const editedCode = pattern instanceof Ast.Ast ? pattern.code() : pattern
   if (editedCode) {
     return (tag: ExpressionTag) =>
-      tag.expression.startsWith(editedCode) ||
-      (tag.explicitLabel != null && tag.explicitLabel.startsWith(editedCode))
+      matches(tag.expression, editedCode) ||
+      (tag.explicitLabel != null && matches(tag.explicitLabel, editedCode))
   }
   return undefined
+}
+
+/** The text typed in the dropdown: a text literal's content, otherwise the code. */
+function searchTextOf(pattern: Ast.Ast | string | undefined): string {
+  if (!pattern) return ''
+  const editedAst = typeof pattern === 'string' ? Ast.parseExpression(pattern) : pattern
+  if (editedAst instanceof Ast.TextLiteral) return editedAst.rawTextContent
+  return pattern instanceof Ast.Ast ? pattern.code() : pattern
+}
+
+/** Tell a searchable argument what is typed (`''`: nothing), so the engine is asked for it. */
+function reportSearch(pattern: Ast.Ast | string | undefined) {
+  props.input[WidgetSearchKey]?.(searchTextOf(pattern))
 }
 
 const configuredTags = useExpressionTags({
@@ -113,7 +135,10 @@ const customTags = computed(
 )
 
 const filteredTags = computed(() => {
-  const expressionFilter = makeExpressionFilter(editedValue.value)
+  const expressionFilter = makeExpressionFilter(
+    editedValue.value,
+    props.input[WidgetSearchKey] != null,
+  )
   if (expressionFilter) {
     const flattened = expressionTags.value.flatMap((tag) =>
       tag instanceof NestedChoiceTag ? tag.flatten() : [tag],
@@ -160,6 +185,7 @@ const selectionArrow = provideSelectionArrow({
 
 function onClose() {
   activity.value = undefined
+  reportSearch(undefined)
 }
 
 const dropDownInteraction = WidgetEditHandler.New(props, {
@@ -183,10 +209,12 @@ const dropDownInteraction = WidgetEditHandler.New(props, {
   start: () => {
     editedWidget.value = undefined
     editedValue.value = undefined
+    reportSearch(undefined)
   },
   edit: (origin, value) => {
     editedWidget.value = origin
     editedValue.value = value
+    reportSearch(value)
   },
   childEnded: () => {
     dropDownInteraction.value.end()

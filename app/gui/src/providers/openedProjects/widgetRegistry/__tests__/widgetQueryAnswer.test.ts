@@ -282,3 +282,76 @@ describe('functionCallFromAnswer', () => {
     )
   })
 })
+
+describe('resolvers in an answer', () => {
+  const resolver = { dependencies: ['self', 'right'], searchable: false }
+
+  test('a resolver answer keeps its widget and its dependencies', () => {
+    const answer = widgetQueryAnswerSchema.parse({
+      arguments: [['on', { widget: textInput, resolver }]],
+      revision: '3',
+    })
+    const call = functionCallFromAnswer(answer)
+    expect(call.parameters.get('on')).toMatchObject({ kind: 'Text_Input' })
+    expect(call.resolvers?.get('on')).toEqual(resolver)
+    expect(call.notes).toBeUndefined()
+    expect(answer.revision).toBe('3')
+  })
+
+  test('an unavailable dependency is no widget and a note', () => {
+    const answer = widgetQueryAnswerSchema.parse({
+      arguments: [
+        ['on', { widget: null, resolver, unavailable: { dependency: 'right', message: 'bad' } }],
+      ],
+    })
+    const call = functionCallFromAnswer(answer)
+    // No widget: the call tree falls back to the type default.
+    expect(call.parameters.get('on')).toBeUndefined()
+    expect(call.errors).toBeUndefined()
+    expect(call.notes?.get('on')).toEqual({
+      kind: 'unavailable',
+      dependency: 'right',
+      message: 'bad',
+    })
+  })
+
+  test("a resolver's error stays an error and keeps its dependencies", () => {
+    const answer = widgetQueryAnswerSchema.parse({
+      arguments: [
+        [
+          'on',
+          {
+            error: { step: 'resolver', message: 'x' },
+            resolver: { dependencies: ['self'], searchable: false },
+          },
+        ],
+      ],
+    })
+    const call = functionCallFromAnswer(answer)
+    expect(call.errors?.get('on')?.step).toBe('resolver')
+    expect(call.resolvers?.get('on')?.dependencies).toEqual(['self'])
+  })
+
+  test('the search and revision echo is read', () => {
+    const answer = widgetQueryAnswerSchema.parse({
+      arguments: [
+        ['query', { widget: textInput, resolver: { dependencies: ['self'], searchable: true } }],
+      ],
+      search: 'abc',
+      revision: '7',
+    })
+    expect(answer.search).toBe('abc')
+    expect(answer.revision).toBe('7')
+    expect(functionCallFromAnswer(answer).resolvers?.get('query')?.searchable).toBe(true)
+  })
+
+  test('a static answer has no resolvers and no notes', () => {
+    const answer = widgetQueryAnswerSchema.parse({
+      arguments: [['arg', { widget: { type: 'Widget', constructor: 'Boolean_Input' } }]],
+    })
+    const call = functionCallFromAnswer(answer)
+    expect(call.resolvers).toBeUndefined()
+    expect(call.notes).toBeUndefined()
+    expect(Object.keys(call)).toEqual(['kind', 'parameters'])
+  })
+})

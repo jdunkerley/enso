@@ -7,7 +7,11 @@ import {
   restoreMockMainFile,
   restoreMockWidgetConfigurations,
   setMockMainFile,
+  setMockResolverAnswer,
   typeDefaultQueryCount,
+  widgetQueriesOf,
+  widgetQueryCount,
+  type MockWidgetQuery,
 } from 'integration-test/mock/lsHandler'
 import * as actions from './actions'
 import { mockMethodCallInfo } from './expressionUpdates'
@@ -528,6 +532,14 @@ test.describe('Dynamic configuration updates', () => {
    * We are using `aggregated` node to test this.
    */
   test('Inherited configuration', async ({ page, localApi, editorPage }) => {
+    // `aggregate`'s widgets are computed from its table: a resolver's answer, asked again for
+    // every new table (a static answer would be asked once per method).
+    const dependsOnTable = (args: [string, unknown][]) => ({
+      arguments: args.map(([name, widget]) => [
+        name,
+        { widget, resolver: { dependencies: ['self'], searchable: false } },
+      ]),
+    })
     await editorPage.mockMethodCallInfo('aggregated', {
       methodPointer: {
         module: 'Standard.Table.Table',
@@ -540,48 +552,51 @@ test.describe('Dynamic configuration updates', () => {
     await actions.showHiddenArguments(page, node)
     await expect(node.locator('.WidgetTopLevelArgument')).toHaveCount(4)
     // Top-level configuration, including configuration for child widgets.
-    await localApi.updateVisualization('.aggregate', [
-      [
-        'columns',
-        {
-          type: 'Widget',
-          constructor: 'Single_Choice',
-          values: [
-            {
-              type: 'Choice',
-              constructor: 'Option',
-              value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Group_By',
-              label: 'Group By',
-              parameters: [
-                [
-                  'column',
-                  {
-                    type: 'Widget',
-                    constructor: 'Single_Choice',
-                    values: [
-                      {
-                        type: 'Choice',
-                        constructor: 'Option',
-                        value: '"column 1"',
-                        label: 'column 1',
-                        parameters: [],
-                      },
-                      {
-                        type: 'Choice',
-                        constructor: 'Option',
-                        value: '"column 2"',
-                        label: 'column 2',
-                        parameters: [],
-                      },
-                    ],
-                  },
+    await localApi.updateVisualization(
+      '.aggregate',
+      dependsOnTable([
+        [
+          'columns',
+          {
+            type: 'Widget',
+            constructor: 'Single_Choice',
+            values: [
+              {
+                type: 'Choice',
+                constructor: 'Option',
+                value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Group_By',
+                label: 'Group By',
+                parameters: [
+                  [
+                    'column',
+                    {
+                      type: 'Widget',
+                      constructor: 'Single_Choice',
+                      values: [
+                        {
+                          type: 'Choice',
+                          constructor: 'Option',
+                          value: '"column 1"',
+                          label: 'column 1',
+                          parameters: [],
+                        },
+                        {
+                          type: 'Choice',
+                          constructor: 'Option',
+                          value: '"column 2"',
+                          label: 'column 2',
+                          parameters: [],
+                        },
+                      ],
+                    },
+                  ],
                 ],
-              ],
-            },
-          ],
-        },
-      ],
-    ])
+              },
+            ],
+          },
+        ],
+      ]),
+    )
     const columnsArg = node
       .locator('.WidgetTopLevelArgument')
       .filter({ has: page.getByText('columns', { exact: true }) })
@@ -645,48 +660,51 @@ test.describe('Dynamic configuration updates', () => {
     await firstItemDropdown.expectVisibleWithOptions(['column 1', 'column 2'])
 
     // Update parent configuration
-    await localApi.updateVisualization('.aggregate', [
-      [
-        'columns',
-        {
-          type: 'Widget',
-          constructor: 'Single_Choice',
-          values: [
-            {
-              type: 'Choice',
-              constructor: 'Option',
-              value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Group_By',
-              label: 'Group By',
-              parameters: [
-                [
-                  'column',
-                  {
-                    type: 'Widget',
-                    constructor: 'Single_Choice',
-                    values: [
-                      {
-                        type: 'Choice',
-                        constructor: 'Option',
-                        value: '"column 5"',
-                        label: 'column 5',
-                        parameters: [],
-                      },
-                      {
-                        type: 'Choice',
-                        constructor: 'Option',
-                        value: '"column 6"',
-                        label: 'column 6',
-                        parameters: [],
-                      },
-                    ],
-                  },
+    await localApi.updateVisualization(
+      '.aggregate',
+      dependsOnTable([
+        [
+          'columns',
+          {
+            type: 'Widget',
+            constructor: 'Single_Choice',
+            values: [
+              {
+                type: 'Choice',
+                constructor: 'Option',
+                value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Group_By',
+                label: 'Group By',
+                parameters: [
+                  [
+                    'column',
+                    {
+                      type: 'Widget',
+                      constructor: 'Single_Choice',
+                      values: [
+                        {
+                          type: 'Choice',
+                          constructor: 'Option',
+                          value: '"column 5"',
+                          label: 'column 5',
+                          parameters: [],
+                        },
+                        {
+                          type: 'Choice',
+                          constructor: 'Option',
+                          value: '"column 6"',
+                          label: 'column 6',
+                          parameters: [],
+                        },
+                      ],
+                    },
+                  ],
                 ],
-              ],
-            },
-          ],
-        },
-      ],
-    ])
+              },
+            ],
+          },
+        ],
+      ]),
+    )
     await firstItemDropdown.expectVisibleWithOptions(['column 5', 'column 6'])
   })
 })
@@ -3255,5 +3273,239 @@ test.describe('Column pickers', () => {
     await expect(delimiter).toBeVisible()
     await delimiter.click()
     await new DropDownLocator(delimiter).expectVisibleWithOptions(["','", "';'"])
+  })
+})
+
+test.describe('Resolvers', () => {
+  const TEXT_TYPE = 'Standard.Base.Data.Text.Text'
+  test.afterEach(restoreMockMainFile)
+  test.afterEach(restoreMockWidgetConfigurations)
+  test.use({
+    setupApi: {
+      local: () =>
+        setMockMainFile(
+          "from Standard.Base import Data\n\nmain =\n    joined = Data.join_like 'r1' 'a' 'k1'\n    first = Data.static_like 'a'\n    second = Data.static_like 'b'\n    listed = Data.tables_like 'q'\n    unjoined = Data.join_like on='a'\n",
+        ),
+    },
+  })
+
+  function method(name: string, args: string[]) {
+    return {
+      type: 'method' as const,
+      module: 'Standard.Base.Data',
+      name,
+      arguments: args.map((arg) => ({
+        name: arg,
+        reprType: TEXT_TYPE,
+        isSuspended: false,
+        hasDefault: false,
+      })),
+      selfType: 'Standard.Base.Data',
+      returnType: 'Standard.Base.Data.Numbers.Integer',
+      isStatic: true,
+      annotations: args,
+    }
+  }
+
+  function pointer(name: string) {
+    return {
+      methodPointer: { module: 'Standard.Base.Data', definedOnType: 'Standard.Base.Data', name },
+      notAppliedArguments: [],
+    }
+  }
+
+  const choice = (...labels: string[]) => ({
+    type: 'Widget',
+    constructor: 'Single_Choice',
+    values: labels.map((label) => ({
+      type: 'Choice',
+      constructor: 'Option',
+      value: `'${label}'`,
+      label,
+      parameters: [],
+    })),
+  })
+  const onResolver = { dependencies: ['self', 'right'], searchable: false }
+
+  /**
+   * `join_like`'s answer: `on` lists the columns of the `right` the query sent (its id, and the
+   * revision of its code and value: an edit may keep the id).
+   */
+  function joinAnswer() {
+    const rightIds: string[] = []
+    return (query: MockWidgetQuery) => {
+      const id = `${query.uuids['right'] ?? ''}@${query.revision}`
+      if (!rightIds.includes(id)) rightIds.push(id)
+      return {
+        arguments: [
+          ['right', { widget: choice('r1', 'r2') }],
+          ['on', { widget: choice(`col_${rightIds.indexOf(id) + 1}`), resolver: onResolver }],
+          ['join_kind', { widget: choice('k1', 'k2') }],
+        ],
+      }
+    }
+  }
+
+  function argument(node: Locator, name: string) {
+    return node
+      .locator('.WidgetTopLevelArgument')
+      .filter({ has: node.page().getByText(name, { exact: true }) })
+  }
+
+  async function joinNode(editorPage: EditorPageActions, page: Page) {
+    await editorPage.mockSuggestion(method('join_like', ['right', 'on', 'join_kind']))
+    await mockMethodCallInfo(page, 'joined', pointer('join_like'))
+    return locate.graphNodeByBinding(page, 'joined')
+  }
+
+  test("join's `on` updates when `right` changes", async ({ editorPage, page }) => {
+    setMockResolverAnswer('.join_like', joinAnswer())
+    const node = await joinNode(editorPage, page)
+    const on = new DropDownLocator(argument(node, 'on'))
+    await on.clickWidget()
+    await on.expectVisibleWithOptions(['col_1'])
+    await page.keyboard.press('Escape')
+    const right = new DropDownLocator(argument(node, 'right'))
+    await right.clickWidget()
+    await right.clickOption('r2')
+    await expect.poll(() => widgetQueryCount('.join_like')).toBe(2)
+    // The re-query sends only the dependency's id.
+    expect(Object.keys(widgetQueriesOf('.join_like')[1]!.uuids)).toEqual(['right'])
+    await on.clickWidget()
+    await on.expectVisibleWithOptions(['col_2'])
+  })
+
+  test('an argument nothing depends on does not re-query', async ({ editorPage, page }) => {
+    setMockResolverAnswer('.join_like', joinAnswer())
+    const node = await joinNode(editorPage, page)
+    await expect(argument(node, 'on').locator('.WidgetSelection')).toHaveCount(1)
+    expect(widgetQueryCount('.join_like')).toBe(1)
+    const kind = new DropDownLocator(argument(node, 'join_kind'))
+    await kind.clickWidget()
+    await kind.clickOption('k2')
+    expect(await moduleCode(page)).toContain("Data.join_like 'r1' 'a' 'k2'")
+    await expect(argument(node, 'on').locator('.WidgetSelection')).toHaveCount(1)
+    expect(widgetQueryCount('.join_like')).toBe(1)
+  })
+
+  test('a method whose widgets are static is asked once, for all its nodes', async ({
+    editorPage,
+    page,
+  }) => {
+    setMockResolverAnswer('.static_like', () => ({
+      arguments: [['arg', { widget: choice('a', 'b') }]],
+    }))
+    await editorPage.mockSuggestion(method('static_like', ['arg']))
+    await mockMethodCallInfo(page, 'first', pointer('static_like'))
+    const first = locate.graphNodeByBinding(page, 'first')
+    await expect(first.locator('.WidgetSelection')).toHaveCount(1)
+    await mockMethodCallInfo(page, 'second', pointer('static_like'))
+    const second = locate.graphNodeByBinding(page, 'second')
+    await expect(second.locator('.WidgetSelection')).toHaveCount(1)
+    expect(widgetQueryCount('.static_like')).toBe(1)
+  })
+
+  test('an input with an error falls back to the type default, with a note', async ({
+    editorPage,
+    page,
+  }) => {
+    setMockResolverAnswer('.join_like', () => ({
+      arguments: [
+        ['right', { widget: choice('r1', 'r2') }],
+        [
+          'on',
+          {
+            widget: null,
+            resolver: onResolver,
+            unavailable: { dependency: 'right', message: 'No such table' },
+          },
+        ],
+        ['join_kind', { widget: choice('k1', 'k2') }],
+      ],
+    }))
+    const node = await joinNode(editorPage, page)
+    const on = argument(node, 'on')
+    const note = on.getByTestId('widget-query-note-unavailable')
+    await expect(note).toBeVisible()
+    await expect(note).toHaveAttribute('aria-label', 'Choices unavailable: right has an error.')
+    // The fallback is Text's own widget, still editable.
+    await expect(on.locator('.WidgetText')).toHaveCount(1)
+    await expect(on.locator('.WidgetSelection')).toHaveCount(0)
+  })
+
+  // An unset `right` is a `Missing_Argument` to the engine, which answers `unavailable` as for a
+  // real error; the GUI shows no marker for an argument the call does not set (#933).
+  test('an unset dependency gets no note', async ({ editorPage, page }) => {
+    setMockResolverAnswer('.join_like', () => ({
+      arguments: [
+        ['right', { widget: choice('r1', 'r2') }],
+        [
+          'on',
+          {
+            widget: null,
+            resolver: onResolver,
+            unavailable: { dependency: 'right', message: 'Provide a value for right.' },
+          },
+        ],
+        ['join_kind', { widget: choice('k1', 'k2') }],
+      ],
+    }))
+    await editorPage.mockSuggestion(method('join_like', ['right', 'on', 'join_kind']))
+    await mockMethodCallInfo(page, 'unjoined', {
+      ...pointer('join_like'),
+      notAppliedArguments: [0, 2],
+    })
+    const node = locate.graphNodeByBinding(page, 'unjoined')
+    const on = argument(node, 'on')
+    await expect(on.locator('.WidgetText')).toHaveCount(1)
+    await expect(node.getByTestId('widget-query-note-unavailable')).toHaveCount(0)
+  })
+
+  test('a slow resolver shows a loading marker, then its widget', async ({ editorPage, page }) => {
+    setMockResolverAnswer('.join_like', joinAnswer(), 3500)
+    const node = await joinNode(editorPage, page)
+    const loading = argument(node, 'on').getByTestId('widget-query-note-loading')
+    await expect(loading).toBeVisible({ timeout: 3000 })
+    await expect(loading).toHaveAttribute('aria-label', 'Loading choices…')
+    await expect(loading).toBeHidden({ timeout: 5000 })
+    await expect(argument(node, 'on').locator('.WidgetSelection')).toHaveCount(1)
+  })
+
+  test('a table-name dropdown searches as you type', async ({ editorPage, page }) => {
+    // Without a search, the engine sends only the first names; a search finds the others.
+    setMockResolverAnswer('.tables_like', (query) => ({
+      arguments: [
+        [
+          'query',
+          {
+            widget:
+              query.search ?
+                choice(
+                  ...['sales_2024', 'sales_2025', 'costs'].filter((name) =>
+                    name.includes(query.search),
+                  ),
+                )
+              : choice('costs', 'sales_2024'),
+            resolver: { dependencies: ['self'], searchable: true },
+          },
+        ],
+      ],
+    }))
+    await editorPage.mockSuggestion(method('tables_like', ['query']))
+    await mockMethodCallInfo(page, 'listed', pointer('tables_like'))
+    const node = locate.graphNodeByBinding(page, 'listed')
+    const query = argument(node, 'query')
+    const dropdown = new DropDownLocator(query)
+    const input = query.getByTestId('widget-text-content')
+    await input.click()
+    await dropdown.expectVisibleWithOptions(['costs', 'sales_2024'])
+    await page.keyboard.type('sal')
+    await dropdown.expectVisibleWithOptions(['sales_2024', 'sales_2025'])
+    // One search query, with the text as typed once the typing paused.
+    expect(
+      widgetQueriesOf('.tables_like')
+        .map((sent) => sent.search)
+        .filter((search) => search !== ''),
+    ).toEqual(['sal'])
   })
 })
