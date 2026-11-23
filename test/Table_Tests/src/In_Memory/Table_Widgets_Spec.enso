@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Metadata.Choice
+from Standard.Base.Metadata.Choice import Option
 import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget_Query
 import Standard.Base.Metadata.Column_Kind.Column_Kind
@@ -19,7 +20,10 @@ table_type = "Standard.Table.Table.Table"
 @columns (Widget.Column_Names)
 Table.widget_test_pick self columns = columns
 
-answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
+answer argument widget columns_json="" = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]' + columns_json + '}'
+
+## The `columns` block of an answer whose pickers all read the subject table.
+subject_columns table = ',"columns":{"":' + (Widget_Columns.from table . to_json) + '}'
 
 ## Checks that the type has a `Widget.from` conversion and that `resolve_type`
    answers exactly that widget.
@@ -29,19 +33,30 @@ check_default typ =
     type_name = Meta.meta typ . qualified_name
     Widget_Query.resolve_type type_name . should_equal ('{"widget":' + widget.to_json + '}')
 
+
+## The widget resolved for `argument` of `method`, as parsed JSON.
+widget_of table method argument =
+    json = Widget_Query.resolve_call table table_module table_type method [argument] . parse_json
+    json.get "arguments" . first . second . get "widget"
+
+## The nested `parameter` widget of the option labelled `option`, found by
+   looking for the option's own JSON in the answer.
+answer_contains table method argument option_label parameter_widget =
+    json = Widget_Query.resolve_call table table_module table_type method [argument]
+    option = Option option_label option_label [[ "column", parameter_widget ]]
+    json.contains option.to_json
+
 add_specs suite_builder =
     suite_builder.group "Widgets for In-Memory with column name sets" group_builder->
         mock_table = Table.from_rows ["A", "B C", 'D "E"', "F.G/H\I"] []
 
         group_builder.specify "works for `get` and `at`" <|
-            choices = mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = answer "selector" (Widget.Single_Choice choices)
+            expect = answer "selector" Widget.Column_Name (subject_columns mock_table)
             Widget_Query.resolve_call mock_table table_module table_type "get" ["selector"] . should_equal expect
             Widget_Query.resolve_call mock_table table_module table_type "at" ["selector"] . should_equal expect
 
         group_builder.specify "works for `filter`" <|
-            choices = [Choice.Option "<Expression>" "(expr '[A]')"] + mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = answer "column" (Widget.Single_Choice choices)
+            expect = answer "column" (Widget.Column_Name expression=True) (subject_columns mock_table)
             Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
 
         group_builder.specify "works for `join` with `right` table" <|
@@ -54,12 +69,7 @@ add_specs suite_builder =
                 "right" -> right_mock_table
                 _ -> Nothing
 
-            with_json = Standard.Table.Internal.Widget_Helpers.make_join_condition_selector self_mock_table cache=mock_cache
-            with_json.should_be_a Widget.With_JSON_Cache
-
-            res = case with_json of
-                Widget.With_JSON_Cache parent _ -> parent
-                _ -> with_json
+            res = Standard.Table.Internal.Widget_Helpers.make_join_condition_selector self_mock_table cache=mock_cache
             res.should_be_a Widget.Vector_Editor
 
             arr = case res of
@@ -72,20 +82,94 @@ add_specs suite_builder =
                 Meta.type_of e . should_equal Choice
 
                 e.parameters.map f->
-                    unwrapped = case f.second of
-                        Widget.With_JSON_Cache parent _ -> parent
-                        _ -> f.second
-                    options = unwrapped.values . map .label
+                    ignore_case = e.label == "Equals (Ignore Case)"
+                    kinds = if ignore_case then [Column_Kind.Textual] else []
                     case f.first of
-                        "left" -> options . should_equal abc
-                        "right" -> options . should_equal uvw
-                        "right_lower" -> options . should_equal uvw
-                        "right_upper" -> options . should_equal uvw
-                        _ -> Test.fail "Unexpected options "+options.to_text+" for "+e.first
+                        "left" -> f.second . should_equal (Widget.Column_Name kinds=kinds)
+                        "right" -> f.second . should_equal (Widget.Column_Name kinds=kinds from="right")
+                        "right_lower" -> f.second . should_equal (Widget.Column_Name from="right")
+                        "right_upper" -> f.second . should_equal (Widget.Column_Name from="right")
+                        _ -> Test.fail "Unexpected parameter "+f.first+" for "+e.first
 
                 e.label
 
             labels . should_equal ['Equals', 'Equals (Ignore Case)', 'Between']
+
+    suite_builder.group "Column pickers filter by the kinds their method accepts" group_builder->
+        mock_table = Table.from_rows ["A", "B"] []
+        textual = [Column_Kind.Textual]
+        numeric = [Column_Kind.Numeric]
+
+        group_builder.specify "aggregate offers numeric columns to numeric statistics and text columns to text ones" <|
+            ["..Sum", "..Average", "..Median", "..Percentile", "..Standard_Deviation"].each label->
+                answer_contains mock_table "aggregate" "columns" label (Widget.Column_Name kinds=numeric expression=True) . should_be_true
+            ["..Count_Not_Empty", "..Count_Empty", "..Shortest", "..Longest"].each label->
+                answer_contains mock_table "aggregate" "columns" label (Widget.Column_Name kinds=textual expression=True) . should_be_true
+            ["..Count_Not_Nothing", "..Count_Nothing", "..Mode", "..Maximum", "..Minimum"].each label->
+                answer_contains mock_table "aggregate" "columns" label (Widget.Column_Name expression=True) . should_be_true
+
+        group_builder.specify "aggregate's Concatenate offers text columns" <|
+            json = Widget_Query.resolve_call mock_table table_module table_type "aggregate" ["columns"]
+            json.contains (Widget.Column_Name kinds=textual expression=True).to_json . should_be_true
+            json.contains '"..Concatenate"' . should_be_true
+
+        group_builder.specify "cross_tab's values shares the aggregate pickers" <|
+            answer_contains mock_table "cross_tab" "values" "..Sum" (Widget.Column_Name kinds=numeric expression=True) . should_be_true
+
+        group_builder.specify "text-only methods offer text columns" <|
+            ["parse", "parse_json", "split_to_columns", "tokenize_to_columns", "fill_empty", "text_replace", "text_cleanse"].each method->
+                (widget_of mock_table method "columns").get "kinds" . should_equal ["Textual"]
+            ["split_to_rows", "tokenize_to_rows", "parse_to_columns"].each method->
+                (widget_of mock_table method "column").get "kinds" . should_equal ["Textual"]
+            ["term", "new_text"].each argument->
+                (widget_of mock_table "text_replace" argument).get "kinds" . should_equal ["Textual"]
+
+        group_builder.specify "methods taking any column keep every kind" <|
+            [["select_columns", "columns"], ["distinct", "columns"], ["cast", "columns"], ["format", "columns"], ["filter", "column"]].each p->
+                (widget_of mock_table p.first p.second).get "kinds" . should_equal []
+
+        group_builder.specify "join's Ignore Case condition offers text columns, Equals offers every kind" <|
+            abc = Table.from_rows ["A", "B", "C"] []
+            cache name = if name == "right" then abc else Nothing
+            item = Standard.Table.Internal.Widget_Helpers.make_join_condition_selector abc cache=cache . item_editor
+            equals = item.values.find o-> o.label == "Equals"
+            ci = item.values.find o-> o.label == "Equals (Ignore Case)"
+            ci.parameters.map .second . should_equal [Widget.Column_Name kinds=textual, Widget.Column_Name kinds=textual from="right"]
+            equals.parameters.map .second . should_equal [Widget.Column_Name, Widget.Column_Name from="right"]
+
+        group_builder.specify "filter's Regex_Match pattern offers text columns" <|
+            choice = Standard.Table.Internal.Widget_Helpers.make_filter_condition_selector mock_table
+            text_group = choice.values.find o-> o.label == "Text"
+            regex = text_group.value.find o-> o.label == "..Regex_Match"
+            pattern = regex.parameters.first.second
+            pattern.kinds . should_equal [Column_Kind.Textual]
+            pattern.extra.map .label . should_equal ["<Regular Expression>"]
+
+        group_builder.specify "the nested Regex_Match pattern picker travels as a picker in the filter answer" <|
+            json = Widget_Query.resolve_call mock_table table_module table_type "filter" ["filter"] . parse_json
+            choice = json.get "arguments" . first . second . get "widget"
+            text_group = choice.get "values" . find o-> o.get "label" == "Text"
+            regex = text_group.get "value" . find o-> o.get "label" == "..Regex_Match"
+            pattern = regex.get "parameters" . first . second
+            pattern.get "constructor" . should_equal "Column_Name"
+            pattern.get "kinds" . should_equal ["Textual"]
+            pattern.get "from" . should_equal Nothing
+
+        group_builder.specify "set's Simple_Expression operands offer the kinds the operation accepts" <|
+            json = Widget_Query.resolve_call mock_table table_module table_type "set" ["value"]
+            kinds_for label parameter kinds_vector =
+                Option label parameter [["rhs", Standard.Table.Internal.Widget_Helpers.make_column_ref_by_name_selector mock_table add_number=True kinds=kinds_vector]]
+            json.contains (kinds_for "multiply" "..Multiply" numeric).to_json . should_be_true
+            json.contains (kinds_for "divide" "..Divide" numeric).to_json . should_be_true
+            json.contains (kinds_for "subtract" "..Subtract" [Column_Kind.Numeric, Column_Kind.Date_Only, Column_Kind.Date_And_Time, Column_Kind.Time_Only]).to_json . should_be_true
+            json.contains '"kinds":["Logical"]' . should_be_true
+            json.contains '"kinds":["Date_Only","Date_And_Time","Time_Only"]' . should_be_true
+            json.contains '"kinds":["Numeric","Textual"]' . should_be_true
+
+        group_builder.specify "generate_rows ranges offer numeric and date columns" <|
+            json = Widget_Query.resolve_call mock_table table_module table_type "generate_rows" ["over"]
+            json.contains '"kinds":["Numeric"]' . should_be_true
+            json.contains '"kinds":["Date_Only"]' . should_be_true
 
     suite_builder.group "Type defaults by conversion" group_builder->
         group_builder.specify "Columns_To_Add" <| check_default Columns_To_Add

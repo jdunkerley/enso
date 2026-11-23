@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { expandColumnPickers, type SchemaCache } from './columnPickers'
 
 /**
  * Intermediate step in the parsing process, when we rename `constructor` field to `kind`.
@@ -109,6 +110,7 @@ export type WidgetConfiguration =
   | FunctionCall
   | OneOfFunctionCalls
   | SomeOfFunctionCalls
+  | ColumnPicker
   | PendingConfiguration
 
 /**
@@ -123,6 +125,54 @@ export interface PendingConfiguration {
 export function pending(): WidgetConfiguration {
   return { kind: 'Pending' }
 }
+
+/** The kind of a table column, as the engine's `Widget.Column_Kind` classifies it. */
+export type ColumnKind =
+  'Numeric' | 'Textual' | 'Logical' | 'Date_Only' | 'Date_And_Time' | 'Time_Only' | 'Other'
+
+/** The columns of one source (the call's subject, or an argument), sent once per answer. */
+export interface WidgetColumns {
+  names: string[]
+  kinds: ColumnKind[]
+  type_names: string[]
+}
+
+/**
+ * A reference to a column picker, which the engine sends instead of the choices themselves. The
+ * IDE expands it (`columnPickers.ts`) from the answer's {@link WidgetColumns}; `from` names the
+ * source (`null`: the call's subject).
+ */
+export interface ColumnNamePicker {
+  kind: 'Column_Name'
+  kinds: ColumnKind[]
+  from: string | null
+  expression: boolean
+  reference: boolean
+  extra: Choice[]
+  columns_first: boolean
+}
+
+export interface ColumnNamesPicker {
+  kind: 'Column_Names'
+  kinds: ColumnKind[]
+  from: string | null
+  regex: boolean
+  by_type: boolean
+}
+
+export interface ColumnVectorPicker {
+  kind: 'Column_Vector'
+  kinds: ColumnKind[]
+  from: string | null
+}
+
+export interface OrderByPicker {
+  kind: 'Order_By'
+  from: string | null
+  name_only: boolean
+}
+
+export type ColumnPicker = ColumnNamePicker | ColumnNamesPicker | ColumnVectorPicker | OrderByPicker
 
 export interface VectorEditor {
   kind: 'Vector_Editor'
@@ -234,6 +284,23 @@ export interface SomeOfFunctionCalls {
   possibleFunctions: Map<string, FunctionCall>
 }
 
+const columnKindSchema = z.enum([
+  'Numeric',
+  'Textual',
+  'Logical',
+  'Date_Only',
+  'Date_And_Time',
+  'Time_Only',
+  'Other',
+])
+
+const widgetColumnsSchema = z.object({
+  names: z.array(z.string()),
+  kinds: z.array(columnKindSchema),
+  // eslint-disable-next-line camelcase
+  type_names: z.array(z.string()),
+})
+
 /** The engine's `Widget.Union`: `kinds` as `[label, widget]` pairs and `include_nothing`. */
 interface RawUnion {
   kind: 'Union'
@@ -288,6 +355,32 @@ export const widgetConfigurationSchema: z.ZodType<WidgetConfiguration, z.ZodType
           kinds: z.array(z.tuple([z.string(), z.lazy(() => widgetConfigurationSchema)])),
           include_nothing: z.boolean().optional(),
         }),
+        z.object({
+          kind: z.literal('Column_Name'),
+          kinds: z.array(columnKindSchema),
+          from: z.string().nullable(),
+          expression: z.boolean(),
+          reference: z.boolean(),
+          extra: z.array(choiceSchema),
+          columns_first: z.boolean(),
+        }),
+        z.object({
+          kind: z.literal('Column_Names'),
+          kinds: z.array(columnKindSchema),
+          from: z.string().nullable(),
+          regex: z.boolean(),
+          by_type: z.boolean(),
+        }),
+        z.object({
+          kind: z.literal('Column_Vector'),
+          kinds: z.array(columnKindSchema),
+          from: z.string().nullable(),
+        }),
+        z.object({
+          kind: z.literal('Order_By'),
+          from: z.string().nullable(),
+          name_only: z.boolean(),
+        }),
         /* eslint-enable camelcase */
       ]),
     )
@@ -316,24 +409,33 @@ const argumentResultSchema = z.union([
 
 /**
  * The answer of `Standard.Base.Metadata.Widget_Query.resolve_call`: for each argument asked
- * for, in order, its widget (`null`: none) or why it has none. An object, so that later fields (a
- * column list sent once, PR 5) can join `arguments`.
+ * for, in order, its widget (`null`: none) or why it has none. `columns` lists the columns once per
+ * source, which column picker references in the widgets point at (key `''`: the call's subject).
  */
 export const widgetQueryAnswerSchema = z.object({
   arguments: z.array(z.tuple([argNameSchema, argumentResultSchema])),
+  columns: z.record(z.string(), widgetColumnsSchema).optional(),
 })
 export type WidgetQueryAnswer = z.infer<typeof widgetQueryAnswerSchema>
 
-/** {@link functionCallConfiguration} of an answer: its widgets as parameters, its errors apart. */
+/**
+ * {@link functionCallConfiguration} of an answer: its widgets as parameters, its errors apart.
+ * Column picker references are expanded from the answer's columns (through `cache`, if given).
+ */
 export function functionCallFromAnswer(
   answer: WidgetQueryAnswer,
   inherited?: FunctionCall,
+  cache?: SchemaCache,
 ): FunctionCall {
   const parameters: ArgumentWidgetConfiguration[] = []
   const errors = new Map<string, WidgetQueryError>()
   for (const [name, result] of answer.arguments) {
     if ('error' in result) errors.set(name, result.error)
-    else parameters.push([name, result.widget])
+    else
+      parameters.push([
+        name,
+        result.widget && expandColumnPickers(result.widget, answer.columns, cache),
+      ])
   }
   const call = functionCallConfiguration(parameters, inherited)
   return errors.size > 0 ? { ...call, errors } : call

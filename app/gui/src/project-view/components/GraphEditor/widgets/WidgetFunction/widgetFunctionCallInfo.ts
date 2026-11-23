@@ -3,9 +3,10 @@ import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import type { ProjectStore } from '$/providers/openedProjects/project'
 import type { NodeVisualizationConfiguration } from '$/providers/openedProjects/project/executionContext'
 import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
-import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
+import type { GroupInfo, SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import { entryIsAnnotatable } from '$/providers/openedProjects/suggestionDatabase/entry'
 import type { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
+import type { SchemaCache } from '$/providers/openedProjects/widgetRegistry/columnPickers'
 import {
   functionCallFromAnswer,
   pending,
@@ -17,6 +18,9 @@ import type { ToValue } from '$/utils/reactivity'
 import { Ast } from '@/util/ast'
 import {
   ArgumentApplication,
+  ArgumentInfoKey,
+  autoscopedConstructorName,
+  deriveAutoscopedCallInfo,
   deriveLocalCallInfoFromCode,
   getAccessOprSubject,
   getMethodCallInfoRecursively,
@@ -31,6 +35,28 @@ import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { widgetQueryConfiguration } from './widgetQuery'
 
 /**
+ * The expression a query with no subject hangs on: the node the call is in, else the call itself.
+ *
+ * Note [A Query With No Subject Hangs On Its Node]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A widget query is a visualization, and the engine runs a visualization when it computes the
+ * expression it is attached to, or at once if that expression's value is in its cache. It caches
+ * a node's value, but not those of the expressions inside it. A call with no subject (an
+ * auto-scoped constructor such as `format=..Delimited`) is usually inside a node, and one picked
+ * from a dropdown is new code in a node the engine has already computed: attached to the call
+ * itself, its query was answered only when something re-ran the node (#933: `delimiter`'s
+ * choices came only after a refresh). Such a query sends `subject_is_type`, so the value it is
+ * attached to is never read, and the node's is as good as any; the arguments the query reads are
+ * looked up by their own ids.
+ */
+export function subjectlessQueryFrame(
+  call: Ast.Expression,
+  graphDb: Pick<GraphDb, 'getExpressionNodeId'>,
+): ExternalId {
+  return graphDb.getExpressionNodeId(call.id) ?? call.externalId
+}
+
+/**
  * A composable gathering information about call for WidgetFunction basing on AST and
  * expression updates.
  */
@@ -42,6 +68,8 @@ export function useWidgetFunctionCallInfo(
   projectNames: ToValue<ProjectNameStore>,
   groups: ToValue<DeepReadonly<GroupInfo[]>>,
   typeDefaults?: ToValue<Pick<TypeDefaults, 'lookup'> | undefined>,
+  schemaCache?: ToValue<SchemaCache | undefined>,
+  suggestionDb?: ToValue<SuggestionDb | undefined>,
 ) {
   const methodCallInfo = computed(() => {
     const _project = toValue(project)
@@ -51,8 +79,24 @@ export function useWidgetFunctionCallInfo(
     const ptr = getPotentialModuleFunctionPointer(expression, projectPath, projectNames, graphDb)
     const derivedLocal = ptr && deriveLocalCallInfoFromCode(ptr, expression, toValue(groups))
     if (derivedLocal) return derivedLocal
-    return getMethodCallInfoRecursively(toValue(input).value, toValue(graphDb))
+    return (
+      getMethodCallInfoRecursively(toValue(input).value, toValue(graphDb)) ??
+      offeredAutoscopedCall()
+    )
   })
+
+  /**
+   * An auto-scoped constructor the engine has not resolved (`deriveAutoscopedCallInfo`), only when
+   * the parent's choice offers it: its option's parameters are then this call's configuration.
+   */
+  function offeredAutoscopedCall() {
+    const db = toValue(suggestionDb)
+    const { value, dynamicConfig, expectedType, [ArgumentInfoKey]: argInfo } = toValue(input)
+    const name = autoscopedConstructorName(value)
+    if (db == null || name == null || dynamicConfig?.kind !== 'OneOfFunctionCalls') return
+    if (!dynamicConfig.possibleFunctions.has('..' + name)) return
+    return deriveAutoscopedCallInfo(value, db, expectedType ?? argInfo?.info?.reprType)
+  }
 
   const interpreted = computed(() => interpretCall(toValue(input).value))
 
@@ -116,11 +160,12 @@ export function useWidgetFunctionCallInfo(
     if (!annotatedArgs?.length) return null
     const names = toValue(projectNames)
     const pointer = info.methodCall.methodPointer
-    // No subject expression (an autoscoped constructor, a static call with no subject): the query
-    // hangs on the call itself, and annotations see the method's type, as before.
+    // No subject expression (an autoscoped constructor, a static call with no subject): the
+    // annotations see the method's type, and the query hangs on the call's node (Note [A Query
+    // With No Subject Hangs On Its Node]).
     const subjectId = widgetQuerySubjectExpressionId.value
     return widgetQueryConfiguration(
-      subjectId ?? toValue(input).value.externalId,
+      subjectId ?? subjectlessQueryFrame(toValue(input).value, toValue(graphDb)),
       {
         module: names.serializeProjectPathForBackend(pointer.module),
         definedOnType: names.serializeProjectPathForBackend(pointer.definedOnType),
@@ -202,7 +247,7 @@ export function useWidgetFunctionCallInfo(
   const widgetConfiguration = computed(() => {
     const parsed = parsedAnswer.value
     if (parsed?.kind === 'answer')
-      return functionCallFromAnswer(parsed.answer, inheritedConfig.value)
+      return functionCallFromAnswer(parsed.answer, inheritedConfig.value, toValue(schemaCache))
     const parameters: FunctionCall['parameters'] = new Map(inheritedConfig.value?.parameters ?? [])
     annotatedArguments.value?.forEach((name) => {
       if (parameters.get(name) == null) parameters.set(name, pending())
@@ -213,7 +258,9 @@ export function useWidgetFunctionCallInfo(
     } satisfies FunctionCall
   })
 
-  const callFrame = computed(() => toValue(input).value.externalId)
+  // A type's query does not read the frame's value either: its node is a frame the engine answers
+  // in at once (Note [A Query With No Subject Hangs On Its Node]).
+  const callFrame = computed(() => subjectlessQueryFrame(toValue(input).value, toValue(graphDb)))
 
   const application = computed(() => {
     const call = interpreted.value

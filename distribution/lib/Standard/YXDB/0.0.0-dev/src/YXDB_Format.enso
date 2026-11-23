@@ -10,11 +10,10 @@ import Standard.Base.System.File_Format.File_Name_Pattern
 import Standard.Base.System.File_Format_Metadata.File_Format_Metadata
 import Standard.Base.System.Input_Stream.Input_Stream
 from Standard.Base.Metadata.Choice import Option
-from Standard.Base.Metadata.Widget import Text_Input
+import Standard.Base.Metadata.Widget
 
 import Standard.Table.Internal.Java_Problems
 import Standard.Base.Internal.Telemetry
-import Standard.Table.Internal.Widget_Helpers
 import Standard.Table.Table.Table
 import Standard.Table.In_Memory_Table.In_Memory_Table
 from Standard.Table.Internal.In_Memory_Helpers import from_java_table
@@ -60,7 +59,7 @@ type YXDB_Format
 
        ## Returns
        An updated table with the specified column converted to GeoJSON.
-    @column _column_widget
+    @column (Widget.Column_Name from="table")
     spatial_column_to_geojson (table : Table & In_Memory_Table = Missing_Argument.throw "table") (column : Text | Integer = Missing_Argument.throw "column") =
         input_column = table.at column
         converted_column = input_column.map v-> YXDB_Format.spatial_to_geojson v
@@ -159,9 +158,3 @@ private handle_java_exceptions caught_panic =
         ex : FileNotFoundException -> File_Error.Not_Found ex.getMessage
         _ -> Illegal_State.Error "Unexpected error reading YXDB file." caught_panic.payload
     Error.throw error
-
-private _column_widget arg cache=Nothing =
-    _ = arg
-    table = cache.if_not_nothing <| cache "table"
-    if table.is_nothing then Text_Input else
-        Widget_Helpers.make_column_name_selector table

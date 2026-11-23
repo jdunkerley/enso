@@ -58,6 +58,7 @@ import project.Internal.Lookup_Helpers
 import project.Internal.Offset_Helper
 import project.Internal.Problem_Builder.Problem_Builder
 import project.Internal.Replace_Helpers
+import project.Internal.Storage
 import project.Internal.Split_Tokenize
 import project.Internal.Table_Helpers
 import project.Internal.Table_Helpers.Table_Column_Helper
@@ -488,12 +489,22 @@ type In_Memory_Table_Implementation
             names = builders.at 0
             kinds = builders.at 1
             type_names = builders.at 2
-            0.up_to java_columns.length . each i->
+            ## Columns share few distinct types: the kind and the type name are
+               worked out once per type, not per column.
+            0.up_to java_columns.length . fold Dictionary.empty known-> i->
                 java_column = java_columns.at i
-                value_type = In_Memory_Column.from_java_column java_column . value_type
+                value_type = Storage.to_value_type java_column.getStorageType
                 names.append java_column.getName
-                kinds.append (Column_Kinds.of_value_type value_type)
-                type_names.append value_type.to_name
+                case known.get value_type if_missing=Nothing of
+                    Nothing ->
+                        entry = Pair.new (Column_Kinds.of_value_type value_type) value_type.to_name
+                        kinds.append entry.first
+                        type_names.append entry.second
+                        known.insert value_type entry
+                    entry ->
+                        kinds.append entry.first
+                        type_names.append entry.second
+                        known
         Widget_Columns.Value (vectors.at 0) (vectors.at 1) (vectors.at 2)
 
     rows (this_table : Table & In_Memory_Table) max_rows:Rows_To_Read =

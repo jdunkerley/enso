@@ -373,6 +373,20 @@ NmZmYiIGQ9Ik0wIDBoNDB2NDBIMHoiLz48L2NsaXBQYXRoPjwvZGVmcz48L3N2Zz4=`,
     ]),
   }
 
+/* eslint-disable camelcase */
+/** A reference to a single-column picker over the subject's columns. */
+const COLUMN_PICKER = {
+  type: 'Widget',
+  constructor: 'Column_Name',
+  kinds: [],
+  from: null,
+  expression: false,
+  reference: false,
+  extra: [],
+  columns_first: false,
+}
+/* eslint-enable camelcase */
+
 const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
   [
     '.read',
@@ -404,121 +418,89 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
   ],
   [
     '.select_columns',
-    encodeJSON([
-      [
-        'columns',
-        {
-          type: 'Widget',
-          constructor: 'Multiple_Choice',
-          values: [
-            {
-              type: 'Choice',
-              constructor: 'Option',
-              value: "'Column A'",
-              label: 'Column A',
-              parameters: [],
+    // The engine sends a reference to the column picker and the subject's columns once; the GUI
+    // expands the reference into the choices.
+    encodeJSON({
+      arguments: [
+        [
+          'columns',
+          {
+            widget: {
+              type: 'Widget',
+              constructor: 'Column_Names',
+              /* eslint-disable camelcase */
+              kinds: [],
+              from: null,
+              regex: false,
+              by_type: false,
+              /* eslint-enable camelcase */
             },
-            {
-              type: 'Choice',
-              constructor: 'Option',
-              value: "'Column B'",
-              label: 'Column B',
-              parameters: [],
-            },
-          ],
-        },
+          },
+        ],
       ],
-    ]),
+      columns: {
+        '': {
+          names: ['Column A', 'Column B'],
+          kinds: ['Textual', 'Textual'],
+          // eslint-disable-next-line camelcase
+          type_names: ['Char', 'Char'],
+        },
+      },
+    }),
   ],
   [
     '.aggregate',
-    encodeJSON([
-      [
-        'columns',
-        {
-          type: 'Widget',
-          constructor: 'Vector_Editor',
-          /* eslint-disable camelcase */
-          item_default: 'Aggregate_Column.Group_By',
-          item_editor: {
-            type: 'Widget',
-            constructor: 'Single_Choice',
-            values: [
-              {
-                type: 'Choice',
-                constructor: 'Option',
-                value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Group_By',
-                label: null,
-                parameters: [
-                  [
-                    'column',
-                    {
-                      type: 'Widget',
-                      constructor: 'Single_Choice',
-                      values: [
-                        {
-                          type: 'Choice',
-                          constructor: 'Option',
-                          value: '"column 1"',
-                          label: 'column 1',
-                          parameters: [],
-                        },
-                        {
-                          type: 'Choice',
-                          constructor: 'Option',
-                          value: '"column 2"',
-                          label: 'column 2',
-                          parameters: [],
-                        },
-                      ],
-                    },
-                  ],
+    encodeJSON({
+      arguments: [
+        [
+          'columns',
+          {
+            widget: {
+              type: 'Widget',
+              constructor: 'Vector_Editor',
+              /* eslint-disable camelcase */
+              item_default: 'Aggregate_Column.Group_By',
+              item_editor: {
+                type: 'Widget',
+                constructor: 'Single_Choice',
+                values: [
+                  {
+                    type: 'Choice',
+                    constructor: 'Option',
+                    value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Group_By',
+                    label: null,
+                    parameters: [['column', COLUMN_PICKER]],
+                  },
+                  {
+                    type: 'Choice',
+                    constructor: 'Option',
+                    value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Count',
+                    label: null,
+                    parameters: [],
+                  },
+                  {
+                    type: 'Choice',
+                    constructor: 'Option',
+                    value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Count_Distinct',
+                    label: null,
+                    parameters: [['columns', COLUMN_PICKER]],
+                  },
                 ],
               },
-              {
-                type: 'Choice',
-                constructor: 'Option',
-                value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Count',
-                label: null,
-                parameters: [],
-              },
-              {
-                type: 'Choice',
-                constructor: 'Option',
-                value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Count_Distinct',
-                label: null,
-                parameters: [
-                  [
-                    'columns',
-                    {
-                      type: 'Widget',
-                      constructor: 'Single_Choice',
-                      values: [
-                        {
-                          type: 'Choice',
-                          constructor: 'Option',
-                          value: '"column 1"',
-                          label: 'column 1',
-                          parameters: [],
-                        },
-                        {
-                          type: 'Choice',
-                          constructor: 'Option',
-                          value: '"column 2"',
-                          label: 'column 2',
-                          parameters: [],
-                        },
-                      ],
-                    },
-                  ],
-                ],
-              },
-            ],
+              /* eslint-enable camelcase */
+            },
           },
-          /* eslint-enable camelcase */
-        },
+        ],
       ],
-    ]),
+      columns: {
+        '': {
+          names: ['column 1', 'column 2'],
+          kinds: ['Textual', 'Textual'],
+          // eslint-disable-next-line camelcase
+          type_names: ['Char', 'Char'],
+        },
+      },
+    }),
   ],
   [
     '.expr',
@@ -993,6 +975,43 @@ function isMethodBodyId(id: string | undefined): boolean {
   return false
 }
 
+/**
+ * Whether `id` is an expression strictly inside a node's binding expression (`x = <here>`). The
+ * engine caches the values of binding expressions and self arguments only (`CachePreferenceAnalysis`),
+ * so a visualization attached to any other expression is answered only when that expression is
+ * computed again, which the mock never does.
+ */
+function isInsideNodeExpression(id: string | undefined): boolean {
+  if (id == null) return false
+  for (const doc of mockModuleDocs) {
+    const root = new Ast.MutableModule(doc).root()
+    if (!(root instanceof Ast.BodyBlock)) continue
+    for (const statement of root.statements()) {
+      if (!(statement instanceof Ast.FunctionDef) || !(statement.body instanceof Ast.BodyBlock))
+        continue
+      for (const line of statement.body.statements()) {
+        if (!(line instanceof Ast.Assignment)) continue
+        let inside = false
+        Ast.visitRecursive(line.expression, (ast) => {
+          if (ast.externalId === id && id !== line.expression.externalId) inside = true
+          return !inside
+        })
+        if (inside) return true
+      }
+    }
+  }
+  return false
+}
+
+/** Whether `request` is a method-pointer widget query sent with `subject_is_type` (no subject). */
+function isSubjectlessWidgetQuery(request: VisRequestPreprocessor): boolean {
+  return (
+    isWidgetQuery(request) &&
+    !(typeof request.expression === 'object' && 'inFrame' in request.expression) &&
+    slotPositionalArgs(request)[5] === 'True'
+  )
+}
+
 /** If the slot's preprocessor is mocked, write the mock bytes into it. */
 function maybeRespondToSlot(slot: YMap<unknown>): void {
   const request = slot.get(VIS_SLOT_FIELDS.request) as VisRequestPreprocessor | undefined
@@ -1007,6 +1026,14 @@ function maybeRespondToSlot(slot: YMap<unknown>): void {
     typeof request.expression === 'object' &&
     'inFrame' in request.expression &&
     !isMethodBodyId(slot.get(VIS_SLOT_FIELDS.nodeExternalId) as string | undefined)
+  ) {
+    return
+  }
+  // A query with no subject attached inside a node, where the engine keeps no value: it would be
+  // answered only when the node runs again (Note [A Query With No Subject Hangs On Its Node]).
+  if (
+    isSubjectlessWidgetQuery(request) &&
+    isInsideNodeExpression(slot.get(VIS_SLOT_FIELDS.nodeExternalId) as string | undefined)
   ) {
     return
   }

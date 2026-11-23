@@ -1,4 +1,5 @@
 from Standard.Base import all
+import Standard.Base.Metadata.Widget_Query
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 from Standard.Table import all
 from Standard.YXDB import all
@@ -7,6 +8,17 @@ from Standard.Test import all
 
 add_specs suite_builder =
     suite_builder.group "YXDB_Format" group_builder->
+        group_builder.specify "spatial_column_to_geojson's column reads the columns of its table argument" <|
+            json = Widget_Query.resolve_call Nothing "Standard.YXDB.YXDB_Format" "Standard.YXDB.YXDB_Format.YXDB_Format" "spatial_column_to_geojson" ["column"] subject_is_type=True . parse_json
+            widget = json.get "arguments" . first . second . get "widget"
+            widget.get "constructor" . should_equal "Column_Name"
+            widget.get "from" . should_equal "table"
+            # With no table, there are no columns.
+            json.get "columns" . should_equal Nothing
+            table = Table.new [["RecordID", [1]], ["Spatial", ["x"]]]
+            cache name = if name == "table" then table else Nothing
+            Widget_Query.columns_json ["table"] Nothing cache . should_contain '"table":{"names":["RecordID","Spatial"]'
+
         group_builder.specify "Should read a YXDB without error (with explicit format)" <|
             data_file = enso_project.data / 'yxdb' / 'AllNormalFields.yxdb'
             yxdb_read = Data.read data_file ..YXDB_Format

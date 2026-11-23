@@ -396,6 +396,10 @@
   component, or a dropdown choice, uses a type from a library the project does
   not import, the import is added with it. Opening a project adds any imports
   its `Main.enso` is missing, and a notice says which.
+- [Column pickers on wide tables are much faster][926]: the column list is sent
+  once per node rather than once per dropdown, and database tables and
+  recomputed tables reuse it. Column dropdowns now offer only columns of a kind
+  the method accepts (`..Sum`, for example, offers number columns).
 
 #### Enso Language & Runtime
 
@@ -603,6 +607,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[926]: https://github.com/jdunkerley/enso/pull/926
 [917]: https://github.com/jdunkerley/enso/pull/917
 [912]: https://github.com/jdunkerley/enso/pull/912
 [903]: https://github.com/jdunkerley/enso/pull/903

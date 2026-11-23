@@ -41,7 +41,6 @@ import Standard.Table.Internal.Table_Helpers.Union_Result_Type
 import Standard.Table.Internal.Table_Ref.Table_Ref
 import Standard.Table.Internal.Value_Type_Checks
 import Standard.Table.Internal.Value_Type_Helpers
-import Standard.Table.Internal.Widget_Helpers
 import Standard.Table.Prefix_Name.Prefix_Name
 import Standard.Table.Refined_Types.Spatial_Column.Spatial_Column
 import Standard.Table.Row_Limit.Row_Limit
@@ -486,17 +485,30 @@ type DB_Table_Implementation
             names = builders.at 0
             kinds = builders.at 1
             type_names = builders.at 2
-            internal_columns.each column->
+            ## Columns share few distinct SQL types: the kind and the type name
+               are worked out once per type, not per column.
+            internal_columns.fold Dictionary.empty cache-> column->
                 names.append column.name
                 known = column.sql_type_reference.known
                 case known of
                     sql_type : SQL_Type ->
-                        value_type = mapping.sql_type_to_value_type sql_type
-                        kinds.append (Column_Kinds.of_value_type value_type)
-                        type_names.append value_type.to_name
+                        entry = cache.get sql_type if_missing=Nothing
+                        case entry of
+                            Nothing ->
+                                value_type = mapping.sql_type_to_value_type sql_type
+                                kind = Column_Kinds.of_value_type value_type
+                                name = value_type.to_name
+                                kinds.append kind
+                                type_names.append name
+                                cache.insert sql_type (Pair.new kind name)
+                            _ ->
+                                kinds.append entry.first
+                                type_names.append entry.second
+                                cache
                     _ ->
                         kinds.append Column_Kind.Other
                         type_names.append ""
+                        cache
         Widget_Columns.Value (vectors.at 0) (vectors.at 1) (vectors.at 2)
 
     rows (this_table : Table & DB_Table) (max_rows : Rows_To_Read) =

@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import { parseWithSpans } from '$/providers/openedProjects/graph/__tests__/parseWithSpans'
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import { TypeInfo } from '$/providers/openedProjects/project/computedValueRegistry'
@@ -28,7 +29,7 @@ import type { MethodPointer } from '@/util/methodPointer'
 import type { Opt } from 'enso-common/src/utilities/data/opt'
 import { Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { expect, test, vi } from 'vitest'
-import { effectScope, nextTick, ref, toValue, type Ref, type WatchSource } from 'vue'
+import { effectScope, nextTick, ref, shallowRef, toValue, type Ref, type WatchSource } from 'vue'
 import { SourceRange } from 'ydoc-shared/util/data/text'
 
 vi.mock('$/providers/engineLogAppend', () => ({
@@ -110,6 +111,7 @@ test.each`
             }
           }
         },
+        getExpressionNodeId: () => undefined,
         getExpressionInfo(astId) {
           if (subjectSpan != null && astId === id('subject')) {
             return {
@@ -156,6 +158,57 @@ test.each`
   },
 )
 
+// Note [A Query With No Subject Hangs On Its Node]: `format=..Delimited` picked in a computed
+// node. The engine caches the node's value, not the constructor's, so a query on the constructor
+// was answered only when the node ran again (#933).
+test('a query with no subject inside a node hangs on the node', () => {
+  const code = 'outer (..Con val1)'
+  const { ast, eid, id } = parseWithSpans(code, {
+    node: SourceRange.fromStartAndLength(0, code.length),
+    call: SourceRange.fromStartAndLength(7, 10),
+  })
+  let inner: Ast.Expression | undefined
+  Ast.visitRecursive(ast, (a) => {
+    if (a.externalId === eid('call') && a instanceof Ast.App) inner = a
+    return inner == null
+  })
+  assert(inner != null)
+  let visConfig: WatchSource<Opt<NodeVisualizationConfiguration>> | undefined
+  useWidgetFunctionCallInfo(
+    WidgetInput.FromAst(inner),
+    {
+      getMethodCallInfo(astId) {
+        if (astId === id('call')) {
+          return {
+            suggestion: con,
+            methodCallSource: astId,
+            methodCall: { notAppliedArguments: [], methodPointer: callPointer(con) },
+          }
+        }
+      },
+      getExpressionInfo() {},
+      getExpressionNodeId: (astId) => (astId === id('call') ? eid('node') : undefined),
+      isNodeUsage: () => false,
+    } as GraphDb,
+    {
+      useVisualizationData(config) {
+        visConfig = config
+        return ref(null)
+      },
+      moduleProjectPath: projectNames.parseProjectPathRaw('local.Project.Main'),
+      assetId: 'project-id',
+    },
+    projectNames,
+    [],
+  )
+  const config = toValue<Opt<NodeVisualizationConfiguration>>(visConfig!)
+  assert(config != null)
+  expect(config.expressionId).toBe(eid('node'))
+  expect(config.expressionId).not.toBe(eid('call'))
+  // `subject_is_type`: the node's value is not read.
+  expect(config.positionalArgumentsExpressions![5]).toBe('True')
+})
+
 /** Set up the call info of `code` (a call of `callSuggestion`) with the widget query answering `data`. */
 function setUpCallInfo(
   code: string,
@@ -183,6 +236,7 @@ function setUpCallInfo(
           }
         },
         getExpressionInfo() {},
+        getExpressionNodeId: () => undefined,
         isNodeUsage: () => false,
       } as GraphDb,
       {
@@ -240,4 +294,33 @@ test('an argument takes its type default, asked in the frame of the call itself'
   assert(application instanceof ArgumentApplication)
   expect(application.argument.toWidgetInput().dynamicConfig).toEqual({ kind: 'Date_Input' })
   expect(lookup).toHaveBeenCalledWith(DATE, info.callExternalId)
+})
+
+test('an answer expands its column pickers from the columns it sends', () => {
+  // The engine's data is not deep-reactive (a deep proxy cannot be `structuredClone`d).
+  const data = shallowRef<Result<unknown> | null>(null)
+  const info = setUpCallInfo('local.Project.Type.method val1 val2', method, data)
+  data.value = Ok({
+    arguments: [
+      [
+        'arg',
+        {
+          widget: {
+            constructor: 'Column_Name',
+            kinds: [],
+            from: null,
+            expression: false,
+            reference: false,
+            extra: [],
+            columns_first: false,
+          },
+        },
+      ],
+    ],
+    columns: { '': { names: ['A'], kinds: ['Textual'], type_names: ['Char'] } },
+  })
+  expect(info.widgetConfiguration.value.parameters.get('arg')).toEqual({
+    kind: 'Single_Choice',
+    values: [{ label: 'A', value: "'A'", parameters: [] }],
+  })
 })

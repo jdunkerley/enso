@@ -12,7 +12,7 @@ import Standard.Visualization.Viz_Table.Viz_Table
 import Standard.Visualization.Viz_Tree.Viz_Tree
 import Standard.Visualization.Viz_Tree.Viz_Tree_Child
 import project.Internal.Viz_Helpers
-import project.Internal.Widget_Helpers
+import Standard.Base.Metadata.Widget
 from project.Internal.Storage import java_to_enso
 
 polyglot java import org.enso.table.data.column.operation.TableVizOperation
@@ -58,7 +58,7 @@ type Row
        ## Arguments
         - `column`: The name or index of the column being looked up.
         - `if_missing`: The value to use if the column isn't present.
-    @column (self -> Widget_Helpers.make_column_name_selector self)
+    @column (Widget.Column_Name)
     get : (Integer | Text) -> Any -> Any
     get self (column:(Integer | Text)=0) ~if_missing=Nothing =
         java_to_enso <| self.java_row.get_value column _->if_missing
@@ -73,7 +73,7 @@ type Row
 
        ## Arguments
         - `column`: The name or index of the column being looked up.
-    @column (self -> Widget_Helpers.make_column_name_selector self)
+    @column (Widget.Column_Name)
     at : (Integer | Text) -> Any
     at self (column:(Integer | Text)=0) =
         if_missing column = case column of

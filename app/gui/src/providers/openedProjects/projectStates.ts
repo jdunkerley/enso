@@ -33,6 +33,7 @@ import type { ProjectInfo, RunningProjectInfo } from './projectInfo'
 import { createProjectNameStore, type ProjectNameStore } from './projectNames'
 import { createSuggestionDbStore, type SuggestionDbStore } from './suggestionDatabase'
 import { WidgetRegistry } from './widgetRegistry'
+import { SchemaCache } from './widgetRegistry/columnPickers'
 import {
   TypeDefaults,
   chooseComputedFrame,
@@ -75,6 +76,7 @@ export interface Initialized {
   graph: GraphStore
   widgetRegistry: WidgetRegistry
   typeDefaults: TypeDefaults
+  schemaCache: SchemaCache
 }
 
 /**
@@ -225,6 +227,7 @@ export function useProjectStates() {
         (source, target) => convertsBetween(suggestionDb.entries, source, target),
       )
       onScopeDispose(() => typeDefaults.dispose())
+      const schemaCache = new SchemaCache()
       const projectId = project.info.id
       localVersioning.watchProject(projectId, () => store.flushModules())
       onScopeDispose(() => localVersioning.unwatchProject(projectId))
@@ -244,6 +247,7 @@ export function useProjectStates() {
           graph,
           widgetRegistry,
           typeDefaults,
+          schemaCache,
           scope,
         } satisfies Initialized),
       )

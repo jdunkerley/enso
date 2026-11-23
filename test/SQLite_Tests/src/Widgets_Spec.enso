@@ -27,7 +27,7 @@ table_module = "Standard.Table.Table"
 table_type = "Standard.Table.Table.Table"
 
 ## The answer for one argument whose widget is `widget`.
-answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
+answer argument widget columns_json="" = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]' + columns_json + '}'
 
 ## Checks that the type has a `Widget.from` conversion and that `resolve_type`
    answers exactly that widget.
@@ -36,6 +36,18 @@ check_default typ =
     widget.should_be_a Widget
     type_name = Meta.meta typ . qualified_name
     Widget_Query.resolve_type type_name . should_equal ('{"widget":' + widget.to_json + '}')
+
+## A table of `width` columns of five kinds and 1000 rows; SQLite stores dates as text. Copied from the widget benchmark.
+make_table width =
+    columns = 0.up_to width . map i->
+        values = case i % 5 of
+            0 -> 0.up_to 1000 . map j-> j+i
+            1 -> 0.up_to 1000 . map j-> (j*0.5)+i
+            2 -> 0.up_to 1000 . map j-> "t"+(j%50).to_text
+            3 -> 0.up_to 1000 . map j-> ((Date.new 2020 1 1) + (Period.new days=(j%365))).to_text
+            _ -> 0.up_to 1000 . map j-> (j%2)==0
+        ["c"+i.to_text, values]
+    Table.new columns
 
 add_specs suite_builder =
     connection = Database.connect (SQLite.In_Memory)
@@ -60,16 +72,32 @@ add_specs suite_builder =
     suite_builder.group "Widgets for In-Database Table with column name sets" group_builder->
         mock_table = connection.query "mock_table"
 
+        columns_json = ',"columns":{"":' + (Widget_Columns.from mock_table . to_json) + '}'
+
         group_builder.specify "works for `get` and `at`" <|
-            choices = mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = answer "selector" (Widget.Single_Choice choices)
+            expect = answer "selector" Widget.Column_Name columns_json
             Widget_Query.resolve_call mock_table table_module table_type "get" ["selector"] . should_equal expect
             Widget_Query.resolve_call mock_table table_module table_type "at" ["selector"] . should_equal expect
 
         group_builder.specify "works for `filter`" <|
-            choices = [Choice.Option "<Expression>" "(expr '[A]')"] + mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = answer "column" (Widget.Single_Choice choices)
+            expect = answer "column" (Widget.Column_Name expression=True) columns_json
             Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
+
+        group_builder.specify "aggregate offers numeric columns to Sum and text columns to Concatenate" <|
+            json = Widget_Query.resolve_call mock_table table_module table_type "aggregate" ["columns"]
+            sum = Option "..Sum" "..Sum" [["column", Widget.Column_Name kinds=[Column_Kind.Numeric] expression=True]]
+            json.contains sum.to_json . should_be_true
+            json.contains (Widget.Column_Name kinds=[Column_Kind.Textual] expression=True).to_json . should_be_true
+
+        group_builder.specify "text-only methods offer text columns" <|
+            ["parse", "fill_empty", "text_replace", "text_cleanse"].each method->
+                json = Widget_Query.resolve_call mock_table table_module table_type method ["columns"] . parse_json
+                json.get "arguments" . first . second . get "widget" . get "kinds" . should_equal ["Textual"]
+
+        group_builder.specify "works for `update_rows`, a Database extension method" <|
+            json = Widget_Query.resolve_call mock_table "Standard.Database.Extensions.Upload_Table" table_type "update_rows" ["key_columns"] . parse_json
+            json.get "arguments" . first . second . get "widget" . get "constructor" . should_equal "Column_Vector"
+            json.get "columns" . get "" . get "names" . should_equal ["A", "B C", 'D "E"', "F.G/H\I"]
 
     suite_builder.group "Widgets for Database" group_builder->
         group_builder.specify "works for `connect`, listing every installed backend" <|
@@ -81,6 +109,17 @@ add_specs suite_builder =
             result.should_contain "DuckDB"
             result.should_contain "Snowflake"
             result.should_contain "Microsoft SQL Server"
+
+    suite_builder.group "Widget answers for 500 columns stay under 50 KB" group_builder->
+        group_builder.specify "every baseline method" <|
+            connection = Database.connect (SQLite.In_Memory)
+            wide = make_table 500
+            table = wide.select_into_database_table connection "wide_500" temporary=True
+            [["select_columns", ["columns"]], ["sort", ["columns"]], ["get", ["selector"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["cross_tab", ["group_by", "names", "values"]], ["join", ["on", "join_kind"]]].each query->
+                answer = Widget_Query.resolve_call table table_module table_type query.first query.second
+                Test.with_clue (query.first + ": ") <|
+                    answer.should_not_contain '"error"'
+                    (answer.length < 50*1024) . should_be_true
 
     suite_builder.group "Type defaults by conversion" group_builder->
         group_builder.specify "Connection_Options" <| check_default Connection_Options

@@ -21,6 +21,7 @@ import {
   ArgumentApplication,
   ArgumentAst,
   ArgumentPlaceholder,
+  deriveAutoscopedCallInfo,
   getMethodCallInfoRecursively,
   interpretCall,
   WidgetQueryErrorKey,
@@ -572,5 +573,66 @@ describe('ArgumentPlaceholder.isHidden', () => {
   ]
   test.each(cases)('$name selected=$selected → hidden=$hidden', ({ name, selected, hidden }) => {
     expect(placeholderNamed(name).isHidden(selected)).toBe(hidden)
+  })
+})
+
+// `table.join on=[(..Equals 'county')]` without `right` (#926): the engine never resolves the
+// condition, so its call info comes from the suggestion database.
+describe('deriveAutoscopedCallInfo', () => {
+  function db() {
+    const suggestionDb = new SuggestionDb()
+    suggestionDb.set(1, makeModule('Standard.Table.Join_Condition'))
+    suggestionDb.set(2, makeType('Standard.Table.Join_Condition.Join_Condition'))
+    suggestionDb.set(
+      3,
+      makeConstructor('Standard.Table.Join_Condition.Join_Condition.Equals', {
+        args: [makeArgument('left', 'Any'), makeArgument('right', 'Any')],
+      }),
+    )
+    // Two types with a `Between` constructor.
+    suggestionDb.set(
+      4,
+      makeConstructor('Standard.Table.Join_Condition.Join_Condition.Between', {
+        args: [makeArgument('left', 'Any'), makeArgument('right_lower', 'Any')],
+      }),
+    )
+    suggestionDb.set(5, makeModule('Standard.Base.Data.Filter_Condition'))
+    suggestionDb.set(6, makeType('Standard.Base.Data.Filter_Condition.Filter_Condition'))
+    suggestionDb.set(
+      7,
+      makeConstructor('Standard.Base.Data.Filter_Condition.Filter_Condition.Between', {
+        args: [makeArgument('lower', 'Any'), makeArgument('upper', 'Any')],
+      }),
+    )
+    return suggestionDb
+  }
+  const call = (code: string) => Ast.parseExpression(code)!
+
+  test('resolves a name only one constructor has, with the applied arguments', () => {
+    const info = deriveAutoscopedCallInfo(call("..Equals 'county'"), db(), undefined)
+    expect(info?.suggestion.name).toBe('Equals')
+    expect(info?.methodCall.methodPointer.definedOnType).toEqual(
+      stdPath('Standard.Table.Join_Condition.Join_Condition'),
+    )
+    expect(info?.methodCall.notAppliedArguments).toEqual([1])
+  })
+
+  test('picks the constructor of the expected type among several', () => {
+    const expected =
+      'Standard.Base.Data.Vector.Vector (Standard.Table.Join_Condition.Join_Condition | Standard.Base.Data.Text.Text) | Standard.Base.Data.Text.Text'
+    const info = deriveAutoscopedCallInfo(call('..Between'), db(), expected)
+    expect(info?.suggestion.arguments.map((arg) => arg.name)).toEqual(['left', 'right_lower'])
+    const filter = deriveAutoscopedCallInfo(
+      call('..Between'),
+      db(),
+      'Standard.Base.Data.Filter_Condition.Filter_Condition',
+    )
+    expect(filter?.suggestion.arguments.map((arg) => arg.name)).toEqual(['lower', 'upper'])
+  })
+
+  test('resolves nothing when the name is ambiguous, unknown or not auto-scoped', () => {
+    expect(deriveAutoscopedCallInfo(call('..Between'), db(), undefined)).toBeUndefined()
+    expect(deriveAutoscopedCallInfo(call('..Nope 1'), db(), undefined)).toBeUndefined()
+    expect(deriveAutoscopedCallInfo(call("Equals 'a'"), db(), undefined)).toBeUndefined()
   })
 })
