@@ -1,0 +1,83 @@
+from Standard.Base import all
+import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+import Standard.Base.Metadata.Choice
+import Standard.Base.Metadata.Widget
+import Standard.Base.Metadata.Widget_Resolver
+
+from Standard.Test import all
+
+on_right table (right = Nothing) (search : Text = "") =
+    Widget.Single_Choice [Choice.Option (table.to_text + "|" + right.to_text + "|" + search)]
+
+subject_only table =
+    _ = table
+    Widget.Text_Input
+
+configured table (flag : Boolean = False) (right = Nothing) =
+    _ = table
+    Widget.Single_Choice [Choice.Option (flag.to_text + right.to_text)]
+
+add_specs suite_builder =
+    suite_builder.group "Widget_Resolver.signature_of" group_builder->
+        group_builder.specify "the subject, the dependencies in order, search apart" <|
+            s = Widget_Resolver.signature_of on_right
+            s.subject . should_equal "table"
+            s.dependencies . should_equal ["right"]
+            s.searchable . should_be_true
+            s.parameters . should_equal ["table", "right", "search"]
+            s.to_json . should_equal '{"dependencies":["self","right"],"searchable":true}'
+
+        group_builder.specify "a pre-applied configuration parameter is not a dependency" <|
+            s = Widget_Resolver.signature_of (configured flag=True)
+            s.dependencies . should_equal ["right"]
+            s.searchable . should_be_false
+
+        group_builder.specify "a lambda's parameters count the same way" <|
+            Widget_Resolver.signature_of (t-> t) . subject . should_equal "t"
+
+        group_builder.specify "a resolver of the subject alone" <|
+            Widget_Resolver.signature_of subject_only . to_json . should_equal '{"dependencies":["self"],"searchable":false}'
+
+    suite_builder.group "Widget_Resolver.check" group_builder->
+        group_builder.specify "accepts argument names and search" <|
+            Widget_Resolver.check (Widget_Resolver.signature_of on_right) ["right", "on"] "Table.join" . should_equal Nothing
+
+        group_builder.specify "names a parameter that is not an argument" <|
+            message = Widget_Resolver.check (Widget_Resolver.signature_of on_right) ["on"] "Table.join"
+            message . should_start_with "The resolver's parameter `right` is not an argument of Table.join, nor `search`."
+
+        group_builder.specify "an open configuration parameter is reported with the fix" <|
+            message = Widget_Resolver.check (Widget_Resolver.signature_of configured) ["right"] "T.m"
+            message . should_contain "`flag`"
+            message . should_contain "pre-apply"
+
+        group_builder.specify "a type default is not checked against a call" <|
+            Widget_Resolver.check (Widget_Resolver.signature_of on_right) Nothing "T" . should_equal Nothing
+
+    suite_builder.group "Widget_Resolver.apply" group_builder->
+        group_builder.specify "fills the subject, each dependency by name and search" <|
+            s = Widget_Resolver.signature_of on_right
+            w = Widget_Resolver.apply on_right s "T" (name-> if name == "right" then "R" else Nothing) "se"
+            w . should_equal (Widget.Single_Choice [Choice.Option "T|R|se"])
+
+        group_builder.specify "an unset dependency is Nothing, its default" <|
+            s = Widget_Resolver.signature_of on_right
+            w = Widget_Resolver.apply on_right s "T" (_-> Nothing) ""
+            w . should_equal (Widget.Single_Choice [Choice.Option "T|Nothing|"])
+
+        group_builder.specify "a pre-applied configuration keeps its value" <|
+            f = configured flag=True
+            w = Widget_Resolver.apply f (Widget_Resolver.signature_of f) "T" (_-> "R") ""
+            w . should_equal (Widget.Single_Choice [Choice.Option "TrueR"])
+
+    suite_builder.group "Widget.Resolver" group_builder->
+        group_builder.specify "cannot be nested in another widget" <|
+            nested = Widget.Vector_Editor item_editor=(Widget.Resolver subject_only) item_default="_"
+            nested.to_json . should_fail_with Illegal_Argument
+
+        group_builder.specify "has no column sources" <|
+            Widget.Resolver subject_only . column_sources . should_equal []
+
+main filter=Nothing =
+    suite = Test.build suite_builder-> add_specs suite_builder
+    suite.run_with_filter filter

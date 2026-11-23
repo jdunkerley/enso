@@ -16,6 +16,7 @@ import org.enso.compiler.pass.lint.{
   NoDuplicateSelfInMethodCalls,
   NoSelfInStatic,
   PrivateBuiltinMethodsCheck,
+  ResolverSignatureCheck,
   ShadowedPatternFields,
   UnusedBindings
 }
@@ -110,6 +111,7 @@ class Passes(config: CompilerConfig) {
               UnusedBindings,
               PrivateBuiltinMethodsCheck.INSTANCE,
               ArgumentDisplayCheck.INSTANCE,
+              ResolverSignatureCheck.INSTANCE,
               NoSelfInStatic,
               NoDuplicateSelfInMethodCalls.INSTANCE
             )

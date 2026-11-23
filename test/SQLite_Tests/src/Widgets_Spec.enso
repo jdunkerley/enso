@@ -27,7 +27,10 @@ table_module = "Standard.Table.Table"
 table_type = "Standard.Table.Table.Table"
 
 ## The answer for one argument whose widget is `widget`.
-answer argument widget columns_json="" = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]' + columns_json + '}'
+answer argument widget columns_json="" resolver="" = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + resolver + '}]]' + columns_json + '}'
+
+## The `resolver` part of an answer whose widget depends on `dependencies`.
+resolver_of dependencies searchable=False = ',"resolver":{"dependencies":' + dependencies.to_json + ',"searchable":' + searchable.to_json + '}'
 
 ## Checks that the type has a `Widget.from` conversion and that `resolve_type`
    answers exactly that widget.
@@ -65,9 +68,21 @@ add_specs suite_builder =
         group_builder.specify "works for `query` and `read`" <|
             table_choices = ['a_table', 'another', 'mock_table'] . map n-> Choice.Option n n.pretty
             choices = table_choices + [Option '<Table_Name>' '..Table_Name ""', Option '<Raw_SQL>' '..Raw_SQL ""']
-            expect = answer "query" (Widget.Single_Choice choices)
+            expect = answer "query" (Widget.Single_Choice choices) resolver=(resolver_of ["self"] True)
             Widget_Query.resolve_call connection sqlite_module sqlite_type "query" ["query"] . should_equal expect
             Widget_Query.resolve_call connection sqlite_module sqlite_type "read" ["query"] . should_equal expect
+
+        group_builder.specify "query's table names are searchable" <|
+            json = Widget_Query.resolve_call connection sqlite_module sqlite_type "query" ["query"] "{}" False "able" . parse_json
+            json.get "search" . should_equal "able"
+            labels = json.get "arguments" . first . second . get "widget" . get "values" . map (o-> o.get "label")
+            labels . should_equal ["a_table", "mock_table", "<Table_Name>", "<Raw_SQL>"]
+
+        group_builder.specify "search escapes LIKE wildcards" <|
+            ## As a LIKE pattern `_` would match every name; searched, only the names that contain it.
+            json = Widget_Query.resolve_call connection sqlite_module sqlite_type "query" ["query"] "{}" False "_" . parse_json
+            labels = json.get "arguments" . first . second . get "widget" . get "values" . map (o-> o.get "label")
+            labels . should_equal ["a_table", "mock_table", "<Table_Name>", "<Raw_SQL>"]
 
     suite_builder.group "Widgets for In-Database Table with column name sets" group_builder->
         mock_table = connection.query "mock_table"
@@ -75,12 +90,12 @@ add_specs suite_builder =
         columns_json = ',"columns":{"":' + (Widget_Columns.from mock_table . to_json) + '}'
 
         group_builder.specify "works for `get` and `at`" <|
-            expect = answer "selector" Widget.Column_Name columns_json
+            expect = answer "selector" Widget.Column_Name columns_json (resolver_of ["self"])
             Widget_Query.resolve_call mock_table table_module table_type "get" ["selector"] . should_equal expect
             Widget_Query.resolve_call mock_table table_module table_type "at" ["selector"] . should_equal expect
 
         group_builder.specify "works for `filter`" <|
-            expect = answer "column" (Widget.Column_Name expression=True) columns_json
+            expect = answer "column" (Widget.Column_Name expression=True) columns_json (resolver_of ["self"])
             Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
 
         group_builder.specify "aggregate offers numeric columns to Sum and text columns to Concatenate" <|
@@ -115,7 +130,7 @@ add_specs suite_builder =
             connection = Database.connect (SQLite.In_Memory)
             wide = make_table 500
             table = wide.select_into_database_table connection "wide_500" temporary=True
-            [["select_columns", ["columns"]], ["sort", ["columns"]], ["get", ["selector"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["cross_tab", ["group_by", "names", "values"]], ["join", ["on", "join_kind"]]].each query->
+            [["select_columns", ["columns"]], ["sort", ["columns"]], ["get", ["selector"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["cross_tab", ["group_by", "names", "values"]], ["join", ["on", "join_kind"]], ["fill_nothing", ["columns", "default"]], ["rename_columns", ["column_map"]], ["format", ["columns", "format"]], ["parse", ["columns", "type", "format"]]].each query->
                 answer = Widget_Query.resolve_call table table_module table_type query.first query.second
                 Test.with_clue (query.first + ": ") <|
                     answer.should_not_contain '"error"'

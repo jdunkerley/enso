@@ -1,0 +1,119 @@
+import project.Any.Any
+import project.Data.Numbers.Integer
+import project.Data.Text.Text
+import project.Data.Vector.Vector
+import project.Error.Error
+import project.Errors.Illegal_Argument.Illegal_Argument
+import project.Function.Function
+import project.Meta
+from project.Data.Boolean import Boolean, False, True
+from project.Data.Json.Extensions import all
+from project.Data.Range.Extensions import all
+from project.Data.Text.Extensions import all
+from project.Nothing import all
+
+## ---
+   private: true
+   ---
+   The parameters of a widget resolver, as `signature_of` reads them.
+
+   A resolver is a function. Its first open parameter receives the call's
+   subject, under any name; every other open parameter is either the name of
+   an argument of the annotated method, defaulted to `Nothing`, or
+   `search : Text = ""`, the text typed in the argument. A parameter applied
+   in the annotation (`(resolver flag=True)`) is configuration, not a
+   dependency.
+type Resolver_Signature
+    ## ---
+       private: true
+       ---
+       ## Arguments
+        - `subject`: The first open parameter's name (`Nothing`: none).
+        - `dependencies`: The other open parameters but `search`, in order.
+        - `searchable`: Whether the resolver takes `search`.
+        - `parameters`: Every open parameter, in order (what `apply` fills).
+    Value (subject : Text | Nothing) (dependencies : Vector Text) (searchable : Boolean) (parameters : Vector Text)
+
+    ## ---
+       private: true
+       ---
+       `{"dependencies":["self",…],"searchable":…}`: `"self"` stands for the
+       subject, and `search` is never listed.
+    to_json self -> Text =
+        start = if self.subject.is_nothing then "" else '"self"'
+        names = self.dependencies.fold start acc-> name->
+            if acc.is_empty then name.to_json else acc + "," + name.to_json
+        '{"dependencies":[' + names + '],"searchable":' + (if self.searchable then "true" else "false") + '}'
+
+## ---
+   private: true
+   ---
+   The signature of a resolver: its open parameters (pending or defaulted;
+   pre-applied ones are configuration and not listed).
+
+   ## Arguments
+    - `resolver`: The resolver.
+signature_of (resolver : Function) -> Resolver_Signature =
+    parameters = Meta.meta resolver . arguments pending=True defaulted=True
+    count = parameters.length
+    if count == 0 then Resolver_Signature.Value Nothing [] False [] else
+        dependencies = Vector.build builder->
+            1.up_to count . each i->
+                name = parameters.at i
+                if name != "search" then builder.append name
+        Resolver_Signature.Value (parameters.at 0) dependencies (dependencies.length < count - 1) parameters
+
+## ---
+   private: true
+   ---
+   The first violation of the resolver rule, or `Nothing`.
+
+   ## Arguments
+    - `signature`: The resolver's signature.
+    - `call_arguments`: The annotated method's argument names. `Nothing` for a
+      type's default resolver, which serves many methods: not checked, and a
+      dependency the call lacks is `Nothing`.
+    - `method_name`: The method, for the message.
+check (signature : Resolver_Signature) (call_arguments : Vector Text | Nothing) (method_name : Text) -> Text | Nothing =
+    if call_arguments.is_nothing then Nothing else
+        bad = signature.dependencies.find (name-> call_arguments.contains name . not) if_missing=Nothing
+        if bad.is_nothing then Nothing else
+            "The resolver's parameter `" + bad + "` is not an argument of " + method_name + ", nor `search`. If it is configuration, pre-apply it in the annotation (`(resolver " + bad + "=…)`)."
+
+## ---
+   private: true
+   ---
+   The most open parameters `apply` fills.
+max_parameters -> Integer = 8
+
+## ---
+   private: true
+   ---
+   Applies the resolver to all its open parameters in one call: the subject
+   first, then for each other parameter the search text (`search`) or
+   `value_of name` (`Nothing` when the argument is not set, its default).
+   All at once, because a call that leaves only defaulted parameters open
+   runs at once with their defaults.
+
+   ## Arguments
+    - `resolver`: The resolver.
+    - `signature`: Its signature (`signature_of resolver`).
+    - `subject`: The call's subject.
+    - `value_of`: An argument's value by name.
+    - `search`: The text typed in the argument.
+apply (resolver : Function) (signature : Resolver_Signature) subject (value_of : Text -> Any) (search : Text) -> Any =
+    parameters = signature.parameters
+    arg i = if i == 0 then subject else
+        name = parameters.at i
+        if name == "search" then search else value_of name
+    case parameters.length of
+        0 -> resolver
+        1 -> resolver (arg 0)
+        2 -> resolver (arg 0) (arg 1)
+        3 -> resolver (arg 0) (arg 1) (arg 2)
+        4 -> resolver (arg 0) (arg 1) (arg 2) (arg 3)
+        5 -> resolver (arg 0) (arg 1) (arg 2) (arg 3) (arg 4)
+        6 -> resolver (arg 0) (arg 1) (arg 2) (arg 3) (arg 4) (arg 5)
+        7 -> resolver (arg 0) (arg 1) (arg 2) (arg 3) (arg 4) (arg 5) (arg 6)
+        8 -> resolver (arg 0) (arg 1) (arg 2) (arg 3) (arg 4) (arg 5) (arg 6) (arg 7)
+        n -> Error.throw (Illegal_Argument.Error ("A resolver takes at most " + max_parameters.to_text + " parameters, not " + n.to_text + "."))

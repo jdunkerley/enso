@@ -22,3 +22,10 @@ main =
             kb = if out.is_nothing then 0 else (out.length / 1024.0).round 1
             flag = if out.is_nothing then "ABSENT" else if out.contains '"error"' then "ERROR" else ""
             IO.println (backend.name + '\t' + query.first + '\t' + (cold.round 2).to_text + '\t' + (warm.round 2).to_text + '\t' + kb.to_text + '\t' + flag)
+        Widget_Query_Bench.dependency_queries.each query->
+            cold = time_ms (Widget_Query_Bench.run_dependency_query backend data query)
+            warm = median (0.up_to 10 . map _-> time_ms (Widget_Query_Bench.run_dependency_query backend data query))
+            out = Widget_Query_Bench.run_dependency_query backend data query
+            kb = if out.is_nothing then 0 else (out.length / 1024.0).round 1
+            flag = if out.is_nothing then "ABSENT" else if out.contains '"error"' then "ERROR" else ""
+            IO.println (backend.name + '\t' + query.first + '\t' + (cold.round 2).to_text + '\t' + (warm.round 2).to_text + '\t' + kb.to_text + '\t' + flag)

@@ -21,7 +21,7 @@ import Standard.Test.Spec_Result.Spec_Result
 
 
 type My_Type
-    @foo (test_method)
+    @foo Test_Type.adder
     @baz (My_Type.Value 1 2 3)
     Value foo bar baz
 
@@ -52,6 +52,10 @@ test_method a b = a + b
 type Test_Type
     Value x
     No_Value
+
+    ## A function of two arguments as an annotation. A type's method, so the
+       widget resolver lint, which reads module methods, leaves it alone.
+    adder a b = a + b
 
 type Sum_Type
     Variant_A x

@@ -85,22 +85,6 @@ type Google_Analytics_Account_Filter
     ## ---
        private: true
        ---
-    default_widget self_arg cache -> Widget =
-        _ = self_arg
-
-        default = [Option "<All>" "..All_Accounts", Option "<Account>" "..Account", Option "<Multiple Accounts>" "..Accounts"]
-
-        credentials = cache.if_not_nothing <| cache "credentials"
-        used_credentials = if credentials != Nothing then credentials else Google_Credential.default
-
-        accounts = Google_Analytics.list_accounts credentials=used_credentials limit=(..First 10)
-        if accounts.is_error then make_single_choice default else
-            options = accounts . map p->(Option (p.name + " (" + p.id + ")") "..Account "+p.id.pretty)
-            make_single_choice default+options
-
-    ## ---
-       private: true
-       ---
     private as_java self -> Array | Nothing = case self of
         Google_Analytics_Account_Filter.All_Accounts -> Nothing
         Google_Analytics_Account_Filter.Account acc -> case acc of
@@ -111,6 +95,29 @@ type Google_Analytics_Account_Filter
                 _ : Google_Analytics_Account -> acc.java_record
                 _ : Text -> _create_analytics_account_from_text acc
             vec.to_array
+
+## The widget of a `Google_Analytics_Account_Filter`: the accounts the call's
+   `credentials` read (the default credentials when not set).
+private _account_filter_widget self_arg (credentials = Nothing) -> Widget =
+    _ = self_arg
+
+    default = [Option "<All>" "..All_Accounts", Option "<Account>" "..Account", Option "<Multiple Accounts>" "..Accounts"]
+
+    used_credentials = if credentials != Nothing then credentials else Google_Credential.default
+
+    accounts = Google_Analytics.list_accounts credentials=used_credentials limit=(..First 10)
+    if accounts.is_error then make_single_choice default else
+        options = accounts . map p->(Option (p.name + " (" + p.id + ")") "..Account "+p.id.pretty)
+        make_single_choice default+options
+
+## ---
+   private: true
+   ---
+   The default widget of `Google_Analytics_Account_Filter`: a resolver of the call's
+   subject and `credentials`.
+Widget.from (that : Google_Analytics_Account_Filter.type) -> Widget =
+    _ = that
+    Widget.Resolver _account_filter_widget
 
 ## ---
    private: true

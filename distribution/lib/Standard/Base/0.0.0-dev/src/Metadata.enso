@@ -11,6 +11,9 @@ import project.Data.Time.Date_Time.Date_Time
 import project.Data.Time.Time_Of_Day.Time_Of_Day
 import project.Data.Vector.Vector
 import project.Enso_Cloud.Enso_Secret.Enso_Secret
+import project.Error.Error
+import project.Errors.Illegal_Argument.Illegal_Argument
+import project.Function.Function
 import project.Metadata.Column_Kind.Column_Kind
 import project.Meta
 import project.System.File.File
@@ -166,9 +169,6 @@ type Widget
        `regex '…'`.
     Regex_Input
 
-    ## Cached JSON Widget
-    With_JSON_Cache parent:Widget json:Text
-
     ## Describes a column name chooser, for a parameter that takes the name of a
        column of a table.
 
@@ -211,9 +211,24 @@ type Widget
     ## ---
        private: true
        ---
-       Customised to_text value to avoid the JSON caching.
+       A widget computed from the call by `function`, a resolver: its first
+       parameter receives the call's subject, every other parameter an
+       argument of the call by name (defaulted to `Nothing`) or `search : Text
+       = ""`, the text typed in the argument (see
+       `Standard.Base.Metadata.Widget_Resolver`). Only ever an argument's whole
+       widget, or a type's default: nested in another widget, its JSON is an
+       error.
+
+       ## Arguments
+        - `function`: The resolver.
+    Resolver function:Function
+
+    ## ---
+       private: true
+       ---
+       A resolver's text names it, not its function.
     to_text self -> Text = case self of
-        Widget.With_JSON_Cache parent _ -> parent.to_text
+        Widget.Resolver _ -> "Widget.Resolver"
         _ -> Any.to_text self=self
 
     ## ---
@@ -256,15 +271,15 @@ type Widget
             '{"constructor":"Column_Vector","kinds":' + '[' + (kinds.map .to_json . join ',') + ']' + ',"from":' + source.to_json + '}'
         Widget.Order_By source name_only ->
             '{"constructor":"Order_By","from":' + source.to_json + ',"name_only":' + name_only.to_json + '}'
-        Widget.With_JSON_Cache _ json -> json
+        Widget.Resolver _ -> Widget.nested_resolver_error
         _ -> self.to_js_object.to_json
 
     ## ---
        private: true
        ---
        The distinct `from` values of every column picker in the widget, in the
-       order first seen, looking through choices, vector editors and cached
-       widgets. `Nothing` stands for the table the node is called on.
+       order first seen, looking through choices, vector editors and union
+       kinds. `Nothing` stands for the table the node is called on.
     column_sources self -> Vector (Text | Nothing) =
         Vector.build builder-> self.collect_column_sources builder
 
@@ -282,7 +297,6 @@ type Widget
         Widget.Multiple_Choice values _ -> Widget.collect_choice_sources values builder
         Widget.Vector_Editor item_editor _ -> item_editor.collect_column_sources builder
         Widget.Union kinds _ -> kinds.each pair-> pair.second.collect_column_sources builder
-        Widget.With_JSON_Cache parent _ -> parent.collect_column_sources builder
         _ -> Nothing
 
     ## ---
@@ -306,10 +320,18 @@ type Widget
     ## ---
        private: true
        ---
+       The error of a `Resolver` asked for its JSON: the widget query runs a
+       resolver, it never serialises one.
+    nested_resolver_error -> Any =
+        Error.throw (Illegal_Argument.Error "A Widget.Resolver can only be an argument's whole widget.")
+
+    ## ---
+       private: true
+       ---
        Override the to_js_object and don't include Nothing.
     to_js_object : JS_Object
     to_js_object self = case self of
-        Widget.With_JSON_Cache parent _ -> parent.to_js_object
+        Widget.Resolver _ -> Widget.nested_resolver_error
         _ ->
             type_pair = [["type", Meta.type_of self . to_text]]
 

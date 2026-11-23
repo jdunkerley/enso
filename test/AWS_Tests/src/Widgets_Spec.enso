@@ -1,0 +1,28 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Widget_Query
+import Standard.Base.Metadata.Widget_Resolver
+
+from Standard.Test import all
+
+## What the resolver annotating `argument` depends on, read offline from its
+   signature (running it would need credentials and the network).
+dependencies_of module type method argument =
+    resolver = Meta.get_method_annotation module type method argument
+    Widget_Resolver.signature_of resolver . to_json
+
+add_specs suite_builder =
+    suite_builder.group "AWS widgets" group_builder->
+        group_builder.specify "Redshift bulk_load's staging_bucket reads staging_bucket_credentials" <|
+            module = "Standard.AWS.Database.Redshift.Redshift_Connection"
+            json = dependencies_of module module+".Redshift_Connection" "bulk_load" "staging_bucket"
+            json . should_equal '{"dependencies":["self","staging_bucket_credentials"],"searchable":false}'
+
+        group_builder.specify "Redshift query's table names are searchable" <|
+            module = "Standard.AWS.Database.Redshift.Redshift_Connection"
+            json = dependencies_of module module+".Redshift_Connection" "query" "query"
+            json . should_equal '{"dependencies":["self"],"searchable":true}'
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

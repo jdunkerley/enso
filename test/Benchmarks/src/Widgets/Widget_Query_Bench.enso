@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Metadata.Widget_Query
+from Standard.Base.Metadata.Widget_Query import Widget_Method
 
 from Standard.Table import Table
 from Standard.Database import all
@@ -28,8 +29,15 @@ make_table width (date_as_text : Boolean = False) =
         ["c"+i.to_text, values]
     Table.new columns
 
-## The baseline's widget queries: method and arguments.
-queries = [["select_columns", ["columns"]], ["sort", ["columns"]], ["get", ["selector"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["cross_tab", ["group_by", "names", "values"]], ["join", ["on"]]]
+## The baseline's widget queries: method and arguments. The last four are
+   resolvers of other arguments (PR 6a), here with those arguments unset, as
+   the IDE asks before the user sets them.
+queries = [["select_columns", ["columns"]], ["sort", ["columns"]], ["get", ["selector"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["cross_tab", ["group_by", "names", "values"]], ["join", ["on"]], ["fill_nothing", ["columns", "default"]], ["rename_columns", ["column_map"]], ["format", ["columns", "format"]], ["parse", ["columns", "type", "format"]]]
+
+## The queries with a dependency set: `filter`'s `filter` once its `column`
+   names a text column (`c2`). The report cannot fake an expression id, so it
+   resolves the argument directly, as `resolve_call` does for it.
+dependency_queries = [["filter (column set)", "filter", "filter", "column", "c2"]]
 
 ## The tables, built when first used. `duckdb` is `Nothing` where DuckDB
    cannot start (the benchmark job also runs off Linux).
@@ -67,6 +75,16 @@ run_query (backend : Backend) data query =
     if table.is_nothing then Nothing else
         Widget_Query.resolve_call table backend.module_name backend.type_name query.first query.second
 
+## One query with a dependency set: `[label, method, argument, dependency,
+   value]`; `Nothing` when the backend is absent.
+run_dependency_query (backend : Backend) data query =
+    table = backend.table data
+    if table.is_nothing then Nothing else
+        method = Widget_Method.Value backend.module_name backend.type_name (query.at 1)
+        values = Widget_Query.values_from_lookup (name-> if name == (query.at 3) then query.at 4 else Nothing)
+        call_arguments = Meta.get_method_argument_names backend.module_name backend.type_name (query.at 1)
+        Widget_Query.resolve_argument method (query.at 2) table values "" call_arguments Nothing . to_json
+
 collect_benches = Bench.build builder->
     data = Data.create
     backends.each backend->
@@ -74,5 +92,8 @@ collect_benches = Bench.build builder->
             queries.each query->
                 group_builder.specify query.first <|
                     run_query backend data query
+            dependency_queries.each query->
+                group_builder.specify (query.first.replace " " "_" . replace "(" "" . replace ")" "") <|
+                    run_dependency_query backend data query
 
 main = collect_benches . run_main

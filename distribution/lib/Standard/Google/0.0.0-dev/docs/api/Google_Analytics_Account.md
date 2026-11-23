@@ -14,7 +14,7 @@
     - Account account:(Standard.Base.Data.Text.Text|Standard.Google.Google_Analytics_Account.Google_Analytics_Account)
     - Accounts accounts:Standard.Base.Data.Vector.Vector
     - All_Accounts
-    - default_widget self_arg:Standard.Base.Any.Any cache:Standard.Base.Any.Any -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Google.Google_Analytics_Account.Google_Analytics_Account_Filter.type -> Standard.Base.Metadata.Widget
 - Standard.Google.Google_Analytics_Account.Google_Analytics_Account_Filter.from that:Standard.Google.Google_Analytics_Account.Google_Analytics_Account -> Standard.Google.Google_Analytics_Account.Google_Analytics_Account_Filter
 - Standard.Google.Google_Analytics_Account.Google_Analytics_Account_Filter.from that:Standard.Base.Data.Text.Text -> Standard.Google.Google_Analytics_Account.Google_Analytics_Account_Filter
 - Standard.Google.Google_Analytics_Account.Google_Analytics_Account_Filter.from that:Standard.Base.Data.Vector.Vector -> Standard.Google.Google_Analytics_Account.Google_Analytics_Account_Filter

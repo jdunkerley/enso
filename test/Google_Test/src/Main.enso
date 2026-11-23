@@ -9,6 +9,8 @@ from Standard.Test import all
 from Standard.Table import Table
 from Standard.Database_Test_Suite.Util import all
 
+import project.Widgets_Spec
+
 ## The `GoogleSheets` credential lives in Enso Cloud (see README.md); a
    secret named without a parent would be looked up in the local store.
 google_sheets_secret = Enso_Secret.get 'GoogleSheets' parent=Enso_File.current_working_directory
@@ -16,6 +18,7 @@ google_sheets_secret = Enso_Secret.get 'GoogleSheets' parent=Enso_File.current_w
 main filter=Nothing =
     suite = Test.build suite_builder->
         add_specs suite_builder
+        Widgets_Spec.add_specs suite_builder
     suite.run_with_filter filter
 
 

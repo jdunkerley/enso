@@ -221,6 +221,15 @@ call; one the call lacks is `Nothing`. The spec's "Google_Analytics_Account" is
 `Google_Analytics_Account_Filter`. 6a stays backward compatible with today's
 GUI, so 6a and 6b merge independently.
 
+**As built in 6a (2026-11-22):** the resolver is applied to all its open
+parameters in one call (`Widget_Resolver.apply`), because a call that leaves
+only defaulted parameters open runs at once with their defaults. A helper with
+many configuration flags is annotated as a lambda of the subject
+(`@term (table-> helper table add_text=True)`) rather than with every flag
+pre-applied. The lint (`ResolverSignatureCheck`) reads lambdas and module
+methods, of this or another module; a type's method (`Bad_Resolvers.m`,
+`Widget.from X`) is not seen by it and is checked only at run time.
+
 ### 4. Unions and vectors: the kind picker
 
 ```

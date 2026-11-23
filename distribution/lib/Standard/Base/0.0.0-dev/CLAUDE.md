@@ -84,6 +84,35 @@ result = "not a number".parse_integer.catch _-> 0
   dropped file's `format` options and `Widget_Query.resolve_type` (a type's
   default widget, no subject), go through `Meta.call_module_method` (the first
   with the `Data` module as the value).
+- **Resolvers: widgets that depend on the call.** An annotation that is a
+  function, or a `Widget.Resolver f`, is a resolver
+  (`src/Metadata/Widget_Resolver.enso`). Its **first** parameter receives the
+  call's subject, under any name (a module function cannot take `self`); every
+  other open parameter is either the name of an argument of the annotated
+  method, **defaulted to `Nothing`** (a resolver is written for the argument not
+  being set), or `search : Text = ""`, the text typed in the argument.
+  Configuration is pre-applied in the annotation
+  (`@query (make_table_name_selector add_custom=True)`) or the resolver is a
+  lambda of the subject (`@term (table-> helper table add_text=True)`).
+  `resolve_call` looks each dependency's value up through `uuids` (expression
+  ids), applies the resolver to all its open parameters at once
+  (`Widget_Resolver.apply`: applied one at a time, a call with only defaulted
+  parameters left would run at once with their defaults), and answers
+  `{"widget":…,"resolver":{"dependencies":["self",…],"searchable":…}}`. A
+  dependency whose value is an error answers `"widget":null` with
+  `"unavailable":{"dependency","message"}` and the resolver does not run (logged
+  once at Info); a parameter that breaks the rule is the argument's error at
+  step `"resolver"`, checked against `Meta.get_method_argument_names` (the
+  method's parameters, `self` excluded); a run over 10 s is logged at Warning.
+  Column pickers announce their sources the same way (`"self"` for the subject).
+  `resolve_call` also takes `search`, `type_defaults` (JSON
+  `{argument: type name}`: an argument with no annotation resolved through its
+  type's default, which may be a resolver) and `revision` (unused, so the IDE
+  can ask again), and echoes `search` and `revision` after `arguments` when they
+  are set. **A widget never reads `cache`**: the old `cache`/`With_JSON_Cache`
+  mechanism is gone. The compiler's `ResolverSignatureCheck` enforces the rule
+  on annotations whose resolver is a lambda or a module method (`lintEnso` fails
+  the build); a type's method is not seen by it and is checked only at run time.
 - **Column pickers.** `Metadata.Column_Kind` (`Numeric`, `Textual`, `Logical`,
   `Date_Only`, `Date_And_Time`, `Time_Only`, `Other`; `of_value` for one value)
   is the broad kind of a column. `Widget_Columns`
@@ -126,7 +155,13 @@ result = "not a number".parse_integer.catch _-> 0
   `{"error":{"step":"lookup"|"type_default","message"}}`); a call in a node's
   frame is
   `Meta.call_module_method 'Standard.Base.Metadata.Widget_Query' 'resolve_type' [] '<qualified type name>'`.
-  Group C types keep `default_widget` until PR 6.
+  A default that needs the call (group C: `Simple_Expression`,
+  `Generate_Rows_Range`, the Google Analytics filters, `DuckDB_GeoFormat`) is a
+  `Widget.Resolver`: `resolve_type` answers `{"widget":null,"resolver":{…}}` for
+  it, and `resolve_call` runs it for an argument named in `type_defaults`, where
+  its dependencies are not checked against the call (one the call lacks is
+  `Nothing`), or for an annotation `Widget.from X`, which is checked like any
+  resolver.
 - **Unions.** A declared union (`Integer | Nothing`) needs nothing: the IDE
   composes its widget from the members' type defaults and shows a kind picker.
   Use `Widget.Union kinds include_nothing` (kinds are `[label, widget]` pairs)

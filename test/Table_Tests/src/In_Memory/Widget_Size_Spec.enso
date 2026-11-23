@@ -21,7 +21,7 @@ make_table width =
     Table.new columns
 
 ## Every method the baseline measured, with its arguments.
-queries = [["select_columns", ["columns"]], ["sort", ["columns"]], ["get", ["selector"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["cross_tab", ["group_by", "names", "values"]], ["join", ["on", "join_kind"]]]
+queries = [["select_columns", ["columns"]], ["sort", ["columns"]], ["get", ["selector"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["cross_tab", ["group_by", "names", "values"]], ["join", ["on", "join_kind"]], ["fill_nothing", ["columns", "default"]], ["rename_columns", ["column_map"]], ["format", ["columns", "format"]], ["parse", ["columns", "type", "format"]]]
 
 add_specs suite_builder =
     suite_builder.group "Widget answers for 500 columns stay under 50 KB" group_builder->

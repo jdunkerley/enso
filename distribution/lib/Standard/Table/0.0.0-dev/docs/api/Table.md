@@ -94,7 +94,7 @@
     - use_first_row_as_names self on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior= -> (Standard.Table.Table.Table&Standard.Base.Any.Any)
     - write self path:Standard.Base.System.File.Generic.Writable_File.Writable_File= format:Standard.Base.Any.Any= on_existing_file:Standard.Base.System.File.Existing_File_Behavior.Existing_File_Behavior= match_columns:Standard.Table.Match_Columns.Match_Columns= on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior= -> (Standard.Base.System.File.File|Standard.Base.Any.Any)!(Standard.Table.Errors.Column_Count_Mismatch|Standard.Base.Errors.Illegal_Argument.Illegal_Argument|Standard.Base.Errors.File_Error.File_Error)
     - zip self right:Standard.Table.Table.Table= keep_unmatched:(Standard.Base.Data.Boolean.Boolean|Standard.Base.Data.Vector.Report_Unmatched)= right_prefix:Standard.Base.Data.Text.Text= on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior= -> (Standard.Table.Table.Table&Standard.Base.Any.Any)
-- make_fill_nothing_default_widget table:Standard.Base.Any.Any cache:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+- make_fill_nothing_default_widget table:Standard.Base.Any.Any columns:Standard.Base.Any.Any= -> Standard.Base.Any.Any
 - Standard.Table.Table.Table.from that:Standard.Table.Column.Column -> Standard.Table.Table.Table
 - Standard.Table.Table.Table.from that:Standard.Base.Data.Text.Text format:Standard.Base.Any.Any= on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior= -> Standard.Table.Table.Table
 - Standard.Table.Table.Table.from that:Standard.Base.Data.Vector.Vector fields:(Standard.Base.Data.Vector.Vector|Standard.Base.Nothing.Nothing)= -> Standard.Table.Table.Table

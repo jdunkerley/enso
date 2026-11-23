@@ -14,7 +14,8 @@ import org.junit.rules.TemporaryFolder;
 /**
  * `Meta.get_method_annotation`, `Meta.find_type_or_module` and `Meta.call_module_method` find a
  * definition by module, type and name, as the IDE's method pointers name it: exactly that
- * definition, not the one dispatch on a value would pick.
+ * definition, not the one dispatch on a value would pick. `Meta.get_method_argument_names` lists
+ * the parameters of the definition found the same way, {@code self} excluded.
  */
 public class MethodLookupTest {
   @Rule public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -39,6 +40,8 @@ public class MethodLookupTest {
 
                 @a ("T's probe")
                 probe self a = a
+
+                two self a (b = 1) = a + b
 
             @a ("Any's probe")
             Any.probe self a = a
@@ -92,6 +95,12 @@ public class MethodLookupTest {
                     b.append (show (Meta.call_module_method m "sum_defaults" [2] 1))
                     b.append (show (Meta.call_module_method m "sum_defaults" [] 1))
                     b.append (show (Meta.call_module_method m "is_error_value" [] (Error.throw "e")))
+                    b.append (show (Meta.get_method_argument_names m t "two"))
+                    b.append (show (Meta.get_method_argument_names m t "stat"))
+                    b.append (show (Meta.get_method_argument_names "local.Proj.Ext" t "ext"))
+                    b.append (show (Meta.get_method_argument_names m m "sum_defaults"))
+                    b.append (show (Meta.get_method_argument_names m t "Value"))
+                    b.append (show (Meta.get_method_argument_names m t "nope"))
                 results.join "|"
             """);
     var projDir = tempFolder.newFolder().toPath();
@@ -101,7 +110,8 @@ public class MethodLookupTest {
         res ->
             assertEquals(
                 "instance a|static a|constructor x|extension a|module a|Any's probe|T's probe"
-                    + "|Nothing|error:No_Such_Method|error:Module_Does_Not_Exist|T|5|6|103|111|True",
+                    + "|Nothing|error:No_Such_Method|error:Module_Does_Not_Exist|T|5|6|103|111|True"
+                    + "|[a, b]|[a]|[a]|[a, b, c]|[x]|error:No_Such_Method",
                 res.asString()));
   }
 }

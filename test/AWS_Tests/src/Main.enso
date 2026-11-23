@@ -6,6 +6,7 @@ import project.Credentials_Spec
 import project.Inter_Backend_File_Operations_Spec
 import project.Redshift_Spec
 import project.Secrets_Spec
+import project.Widgets_Spec
 import project.S3_Spec
 
 main filter=Nothing =
@@ -15,5 +16,6 @@ main filter=Nothing =
         Inter_Backend_File_Operations_Spec.add_specs suite_builder
         Redshift_Spec.add_specs suite_builder
         Secrets_Spec.add_specs suite_builder
+        Widgets_Spec.add_specs suite_builder
 
     suite.run_with_filter filter

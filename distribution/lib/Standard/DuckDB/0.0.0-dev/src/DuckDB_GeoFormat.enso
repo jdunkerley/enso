@@ -31,7 +31,16 @@ type DuckDB_GeoFormat
         DuckDB_GeoFormat.KML -> ", DRIVER 'KML'"
         DuckDB_GeoFormat.Custom_Driver name opts -> ", DRIVER '" + (name.replace "'" "''") + "'" + (if opts != "" then " LAYER_CREATION_OPTIONS '" + (opts.replace "'" "''") + "'" else "")
 
-    private default_widget connection:DuckDB_Connection -> Widget =
-        drivers = connection.spatial_drivers.at "short_name" . to_vector . map n-> Option n n.pretty
-        values = [Option "..Shapefile" "..Shapefile", Option "..MapInfo" "..MapInfo", Option "..GeoJSON" "..GeoJSON", Option "..KML" "..KML", Option "<Custom>" "..Custom_Driver" parameters=[["driver_name", Single_Choice values=drivers]]]
-        Single_Choice values=values
+## The widget of a `DuckDB_GeoFormat`: the connection's spatial drivers.
+private _geo_format_widget connection:DuckDB_Connection -> Widget =
+    drivers = connection.spatial_drivers.at "short_name" . to_vector . map n-> Option n n.pretty
+    values = [Option "..Shapefile" "..Shapefile", Option "..MapInfo" "..MapInfo", Option "..GeoJSON" "..GeoJSON", Option "..KML" "..KML", Option "<Custom>" "..Custom_Driver" parameters=[["driver_name", Single_Choice values=drivers]]]
+    Single_Choice values=values
+
+## ---
+   private: true
+   ---
+   The default widget of `DuckDB_GeoFormat`: a resolver of the call's connection.
+Widget.from (that : DuckDB_GeoFormat.type) -> Widget =
+    _ = that
+    Widget.Resolver _geo_format_widget

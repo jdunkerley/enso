@@ -129,7 +129,7 @@ type Postgres_Connection
 
        ## Arguments
         - schema: The name of the schema to connect to.
-    @schema make_schema_selector
+    @schema (make_schema_selector include_any=False)
     set_schema : Text -> Connection ! SQL_Error
     set_schema self schema =
         if schema == self.schema then self else
@@ -192,7 +192,7 @@ type Postgres_Connection
           is raised.
         - If provided with a `Table_Name` or a text short-hand and the table is
           not found, a `Table_Not_Found` error is raised.
-    @query make_table_name_selector
+    @query (make_table_name_selector add_custom=True)
     query : SQL_Query -> Text -> Table & DB_Table ! Table_Not_Found
     query self query:SQL_Query alias="" =
         query.to_db_table self alias
@@ -217,7 +217,7 @@ type Postgres_Connection
        it is provided with a DML query. Usually it is preferred to use
        `execute_update` for DML queries, or if they are supposed to return
        results, the `read` should be wrapped in an execution context check.
-    @query make_table_name_selector
+    @query (make_table_name_selector add_custom=True)
     read : SQL_Query -> Rows_To_Read -> Table ! Table_Not_Found
     read self query:SQL_Query (limit : Rows_To_Read = ..First_With_Warning 1000) =
         self.connection.read query limit
@@ -417,7 +417,7 @@ type Postgres_Connection
        ## Arguments
        - `table_name`: the name of the table to get the primary key for.
        - `schema_name`: optionally, the schema name where the table is located.
-    @table_name make_table_name_selector add_custom=False
+    @table_name (make_table_name_selector add_custom=False)
     fetch_primary_key : Text -> Text -> Vector Text ! Nothing
     fetch_primary_key self table_name:Text schema_name:Text="" =
         self.base_connection.fetch_primary_key table_name schema_name

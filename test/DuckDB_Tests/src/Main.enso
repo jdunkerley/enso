@@ -6,6 +6,7 @@ import project.DuckDB_Extra_Pending_Spec
 import project.DuckDB_In_Memory_Spec
 import project.DuckDB_Parquet_Spec
 import project.DuckDB_Spec
+import project.DuckDB_Widgets_Spec
 
 main filter=Nothing =
     suite = Test.build suite_builder->
@@ -13,5 +14,6 @@ main filter=Nothing =
         DuckDB_In_Memory_Spec.add_specs suite_builder
         DuckDB_Parquet_Spec.add_specs suite_builder
         DuckDB_Spec.add_specs suite_builder
+        DuckDB_Widgets_Spec.add_specs suite_builder
 
     suite.run_with_filter filter

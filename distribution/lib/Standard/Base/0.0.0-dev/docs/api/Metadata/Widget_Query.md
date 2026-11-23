@@ -1,7 +1,8 @@
 ## Enso Signatures 1.0
 ## module Standard.Base.Metadata.Widget_Query
 - type Argument_Result
-    - Failed failure:Standard.Base.Metadata.Widget_Query.Widget_Failure
+    - Dynamic widget:(Standard.Base.Metadata.Widget|Standard.Base.Nothing.Nothing) json:Standard.Base.Data.Text.Text signature:Standard.Base.Metadata.Widget_Resolver.Resolver_Signature unavailable:Standard.Base.Data.Text.Text
+    - Failed failure:Standard.Base.Metadata.Widget_Query.Widget_Failure signature:(Standard.Base.Metadata.Widget_Resolver.Resolver_Signature|Standard.Base.Nothing.Nothing)
     - Resolved widget:(Standard.Base.Metadata.Widget|Standard.Base.Nothing.Nothing) json:Standard.Base.Data.Text.Text
     - to_json self -> Standard.Base.Data.Text.Text
 - type Widget_Failure
@@ -11,9 +12,12 @@
 - type Widget_Method
     - Value module_name:Standard.Base.Data.Text.Text type_name:Standard.Base.Data.Text.Text method_name:Standard.Base.Data.Text.Text
     - qualified_name self -> Standard.Base.Data.Text.Text
-- columns_json sources:Standard.Base.Data.Vector.Vector subject:Standard.Base.Any.Any cache:Standard.Base.Function.Function method:Standard.Base.Metadata.Widget_Query.Widget_Method= inputs:Standard.Base.Data.Text.Text= -> Standard.Base.Data.Text.Text
+- columns_json sources:Standard.Base.Data.Vector.Vector subject:Standard.Base.Any.Any value_of:Standard.Base.Function.Function method:Standard.Base.Metadata.Widget_Query.Widget_Method= inputs:Standard.Base.Data.Text.Text= -> Standard.Base.Data.Text.Text
 - log_failure failure:Standard.Base.Metadata.Widget_Query.Widget_Failure inputs:Standard.Base.Data.Text.Text -> Standard.Base.Data.Boolean.Boolean
-- resolve_argument method:Standard.Base.Metadata.Widget_Query.Widget_Method argument:Standard.Base.Data.Text.Text subject:Standard.Base.Any.Any cache:Standard.Base.Function.Function -> Standard.Base.Metadata.Widget_Query.Argument_Result
-- resolve_call value:Standard.Base.Any.Any module_name:Standard.Base.Data.Text.Text type_name:Standard.Base.Data.Text.Text method_name:Standard.Base.Data.Text.Text argument_names:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) uuids:Standard.Base.Data.Text.Text= subject_is_type:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Data.Text.Text
+- resolve_argument method:Standard.Base.Metadata.Widget_Query.Widget_Method argument:Standard.Base.Data.Text.Text subject:Standard.Base.Any.Any value_of:Standard.Base.Function.Function search:Standard.Base.Data.Text.Text= call_arguments:(Standard.Base.Data.Vector.Vector|Standard.Base.Nothing.Nothing)= type_default:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)= -> Standard.Base.Metadata.Widget_Query.Argument_Result
+- resolve_call value:Standard.Base.Any.Any module_name:Standard.Base.Data.Text.Text type_name:Standard.Base.Data.Text.Text method_name:Standard.Base.Data.Text.Text argument_names:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) uuids:Standard.Base.Data.Text.Text= subject_is_type:Standard.Base.Data.Boolean.Boolean= search:Standard.Base.Data.Text.Text= type_defaults:Standard.Base.Data.Text.Text= revision:Standard.Base.Data.Text.Text= -> Standard.Base.Data.Text.Text
 - resolve_type type_name:Standard.Base.Data.Text.Text -> Standard.Base.Data.Text.Text
 - resolve_type_argument method:Standard.Base.Metadata.Widget_Query.Widget_Method type_name:Standard.Base.Data.Text.Text -> Standard.Base.Metadata.Widget_Query.Argument_Result
+- run_resolver method:Standard.Base.Metadata.Widget_Query.Widget_Method argument:Standard.Base.Data.Text.Text resolver:Standard.Base.Function.Function subject:Standard.Base.Any.Any value_of:Standard.Base.Function.Function search:Standard.Base.Data.Text.Text call_arguments:(Standard.Base.Data.Vector.Vector|Standard.Base.Nothing.Nothing) slow_ms:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Metadata.Widget_Query.Argument_Result
+- slow_message method:Standard.Base.Metadata.Widget_Query.Widget_Method argument:Standard.Base.Data.Text.Text elapsed_ms:Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text
+- values_from_lookup lookup:Standard.Base.Function.Function -> Standard.Base.Function.Function

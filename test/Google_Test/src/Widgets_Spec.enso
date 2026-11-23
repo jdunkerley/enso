@@ -1,0 +1,36 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Widget_Query
+import Standard.Base.Metadata.Widget_Resolver
+from Standard.Base.Metadata.Widget_Query import Widget_Method
+
+from Standard.Test import all
+
+## What the resolver annotating `argument` depends on, read offline from its
+   signature (running it would need credentials and the network).
+dependencies_of module type method argument =
+    resolver = Meta.get_method_annotation module type method argument
+    Widget_Resolver.signature_of resolver . to_json
+
+add_specs suite_builder =
+    suite_builder.group "Google widgets" group_builder->
+        module = "Standard.Google.Google_Analytics"
+        typ = module + ".Google_Analytics"
+
+        group_builder.specify "the account filter and property defaults are resolvers of the credentials" <|
+            ["Standard.Google.Google_Analytics_Account.Google_Analytics_Account_Filter", "Standard.Google.Google_Analytics_Property.Google_Analytics_Property"].each type_name->
+                Widget_Query.resolve_type type_name . should_equal '{"widget":null,"resolver":{"dependencies":["self","credentials"],"searchable":false}}'
+
+        group_builder.specify "read's metrics and dimensions read the property and the credentials" <|
+            ["metrics", "dimensions"].each argument->
+                dependencies_of module typ "read" argument . should_equal '{"dependencies":["self","property","credentials"],"searchable":false}'
+
+        group_builder.specify "without a property, the metrics fall back to a fixed list, offline" <|
+            method = Widget_Method.Value module typ "read"
+            values = Widget_Query.values_from_lookup (_-> Nothing)
+            json = Widget_Query.resolve_argument method "metrics" Nothing values "" (Meta.get_method_argument_names module typ "read") Nothing . to_json . parse_json
+            json.get "widget" . get "constructor" . should_equal "Vector_Editor"
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter
