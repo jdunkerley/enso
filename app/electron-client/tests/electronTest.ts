@@ -506,8 +506,10 @@ export async function showSelectedComponent(page: Page) {
  * Add the hidden parameter `name` to the selected component through a ＋ menu, as a user does:
  * selecting a component does not show its hidden parameters (#836). A selected component has a ＋
  * for each call that hides some (`set` and the `Simple_Expression` in its `value`, say); the first
- * whose menu offers `name` is used. The parameter is written with its default value. Returns the
- * added argument, and brings the component, which has grown, back into view.
+ * whose menu offers `name` is used. The parameter is written with its default value. A parameter
+ * the method's doc front matter marks `selected` is already shown on the selected component, and the
+ * ＋ menus leave it out: it is returned as it is, unset. Returns the argument, and brings the
+ * component, which has grown, back into view.
  */
 export async function addParameter(page: Page, name: string): Promise<Locator> {
   const selected = page.locator('.GraphNode.selected')
@@ -515,10 +517,21 @@ export async function addParameter(page: Page, name: string): Promise<Locator> {
   const buttons = selected.getByRole('button', { name: 'Add argument' })
   const menu = page.getByRole('dialog', { name: 'Add argument' })
   const item = menu.getByRole('button', { name: new RegExp(`^${name}( |$)`) })
+  // An argument shown unset has no `data-pop-out-name` (only a set one can be popped out), so it is
+  // found by its name. The innermost match is the argument itself, not a call around it.
+  const shown = selected
+    .locator('.WidgetArgumentName')
+    .filter({ has: page.locator('.name', { hasText: new RegExp(`^${name}$`) }) })
+    .last()
   await expect(buttons.first()).toBeVisible()
   // The component re-renders as the engine answers (types, widget configurations), which can
   // close an open menu or replace a button: start again until the item is picked.
+  let alreadyShown = false
   await expect(async () => {
+    if (await shown.isVisible()) {
+      alreadyShown = true
+      return
+    }
     if (await menu.isVisible()) await page.keyboard.press('Escape')
     await expect(menu).toBeHidden({ timeout: 2000 })
     for (const button of await buttons.all()) {
@@ -536,6 +549,10 @@ export async function addParameter(page: Page, name: string): Promise<Locator> {
     }
     throw new Error(`No ＋ menu of the selected component offers "${name}"`)
   }).toPass({ timeout: 30_000 })
+  if (alreadyShown) {
+    await showAll(page, selected)
+    return shown
+  }
   const argument = selected.locator(`[data-pop-out-name="${name}"]`)
   await expect(argument).toHaveCount(1)
   await showAll(page, selected)
