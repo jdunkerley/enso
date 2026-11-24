@@ -280,6 +280,8 @@ type File
        aliases: [import, load, open]
        group: Input
        icon: data_input
+       arguments:
+         format: selected
        ---
        Read a file using the specified file format
 
