@@ -514,6 +514,9 @@
 
 #### Enso Standard Library
 
+- [Selecting a node shows the arguments you most often change: `format` on
+  `Data.read`, `Data.read_many` and `File.read`, `name_filter` on `Data.list`
+  and `as` on `Table.set`.][940]
 - [`Date_Time`'s functions are documented with examples you can copy into the
   graph][903]
 - [`Time_Of_Day`'s functions are documented with examples you can copy into the
@@ -611,6 +614,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[940]: https://github.com/jdunkerley/enso/pull/940
 [933]: https://github.com/jdunkerley/enso/pull/933
 [926]: https://github.com/jdunkerley/enso/pull/926
 [917]: https://github.com/jdunkerley/enso/pull/917

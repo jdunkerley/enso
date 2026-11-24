@@ -47,6 +47,8 @@ from project.System.File_Format import Auto_Detect, File_Format
    group: File
    icon: data_input
    suggested: 1
+   arguments:
+     format: selected
    ---
    Reads a file into Enso.
    Uses the specified file format to parse the file into an Enso type. If not
@@ -121,6 +123,8 @@ read path=(Missing_Argument.throw "path") format=Auto_Detect (on_problems : Prob
    group: File
    icon: data_input
    suggested: 2
+   arguments:
+     format: selected
    ---
    Reads a list of files into Enso.
 
@@ -220,6 +224,7 @@ read_text path=(Missing_Argument.throw "path") (encoding : Encoding = Encoding.d
    suggested: 3
    arguments:
      directory: always
+     name_filter: selected
    ---
    Lists files in a directory.
 

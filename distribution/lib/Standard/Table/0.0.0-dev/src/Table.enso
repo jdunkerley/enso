@@ -2673,6 +2673,8 @@ type Table
        group: Standard.Base.Values
        icon: column_add
        suggested: 3
+       arguments:
+         as: selected
        ---
        Adds or updates a column on the table.
 
