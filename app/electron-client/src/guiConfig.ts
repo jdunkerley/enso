@@ -3,7 +3,7 @@ import { extractFile } from '@electron/asar'
 import type { $Config } from 'enso-gui/src/config'
 import { createRequire } from 'node:module'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { runInNewContext } from 'node:vm'
 
 const GUI_ENV_PREFIX = 'ENSO_IDE_'
@@ -53,7 +53,7 @@ async function loadGuiConfigUncached(): Promise<$Config> {
     const nodeModulesPath = process.env.NODE_MODULES_PATH
     const require = createRequire(`${nodeModulesPath}/package.json`)
     const vitePath = require.resolve('vite')
-    const { loadEnv } = await import(vitePath)
+    const { loadEnv } = await import(pathToFileURL(vitePath).href)
     // Keep consistent with the Electron content server Vite middleware.
     const mode = process.env.MODE ?? 'staging'
     const envFromFiles = loadEnv(mode, GUI_ENV_DIR, GUI_ENV_PREFIX)
