@@ -335,7 +335,10 @@ describe('VisualizationBridge', () => {
     expect(internal.slotMeta.has(rid)).toBe(false)
   })
 
-  it('ignores late data frames for slots that are already failed', () => {
+  it('lets a persistent slot recover after a failure, and fail again', () => {
+    // A persistent attach stays attached in the runtime across a failed evaluation: when the node
+    // is fixed, the next update is a success. Keeping the slot `failed` left the visualization
+    // showing the old error (an empty table) until its type was switched.
     const f = makeFixture()
     const rid = newVisRequestId()
     f.vis.createSlot(
@@ -347,8 +350,45 @@ describe('VisualizationBridge', () => {
       },
       rid,
     )
+    const sendFrame = (text: string) => {
+      const payload = new TextEncoder().encode(text)
+      const frame = new Uint8Array(16 + payload.byteLength)
+      frame.set(uuidToBytes(rid), 0)
+      frame.set(payload, 16)
+      f.peerData.send(frame)
+    }
+    const sendFailure = (message: string) =>
+      f.peerControl.send(JSON.stringify({ kind: 'failed', requestId: rid, message }))
 
-    // Runtime signals failure first.
+    sendFailure('evaluation failed')
+    expect(f.vis.getSlot(rid as VisRequestId)?.status).toBe('failed')
+
+    sendFrame('recovered')
+    let view = f.vis.getSlot(rid as VisRequestId)
+    expect(view?.status).toBe('ready')
+    expect(new TextDecoder().decode(view!.response!)).toBe('recovered')
+    expect(view?.failure).toBeUndefined()
+
+    sendFailure('failed again')
+    view = f.vis.getSlot(rid as VisRequestId)
+    expect(view?.status).toBe('failed')
+    expect(view?.failure?.message).toBe('failed again')
+    expect(view?.response).toBeUndefined()
+  })
+
+  it('ignores late data frames for in-frame slots that already failed', () => {
+    const f = makeFixture()
+    const rid = newVisRequestId()
+    f.vis.createSlot(
+      {
+        visualizationId: VIS_ID,
+        contextId: CTX_ID,
+        nodeExternalId: NODE_ID,
+        request: { visualizationModule: '', expression: { inFrame: '1 + 2' } },
+      },
+      rid,
+    )
+
     f.peerControl.send(
       JSON.stringify({
         kind: 'failed',
@@ -358,8 +398,7 @@ describe('VisualizationBridge', () => {
     )
     expect(f.vis.getSlot(rid as VisRequestId)?.status).toBe('failed')
 
-    // A late data frame must not resurrect the slot to `ready` because that
-    // would flip a terminal outcome to a spurious success.
+    // A one-shot's failure is its answer: a late data frame must not flip it to a success.
     const payload = new TextEncoder().encode('late')
     const frame = new Uint8Array(16 + payload.byteLength)
     frame.set(uuidToBytes(rid), 0)
@@ -369,7 +408,6 @@ describe('VisualizationBridge', () => {
     const view = f.vis.getSlot(rid as VisRequestId)
     expect(view?.status).toBe('failed')
     expect(view?.failure?.message).toBe('evaluation failed')
-    // Original failure payload must not be accompanied by response bytes.
     expect(view?.response).toBeUndefined()
   })
 

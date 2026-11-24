@@ -145,16 +145,14 @@ export class VisualizationSlotView {
   /**
    * True once the slot will not change status again.
    *
-   * `failed` is terminal for every slot. `ready` is terminal only for slots
-   * whose request is an `inFrame` one-shot. The runtime auto-detaches those
-   * after the first response, so the client consumes the payload and removes
-   * the slot rather than expecting further updates. For persistent attaches
-   * a detach is a slot deletion, not a terminal status.
+   * Only an `inFrame` one-shot has terminal states (`ready` and `failed`). The
+   * runtime auto-detaches it after the first answer, so the client consumes
+   * the payload and removes the slot rather than expecting further updates. A
+   * persistent attach is never terminal (Note [A Persistent Attach Recovers]).
    */
   isTerminal(): boolean {
     const s = this.status
-    if (s === 'failed') return true
-    return s === 'ready' && isInFrameRequest(this.request)
+    return (s === 'ready' || s === 'failed') && isInFrameRequest(this.request)
   }
 }
 
@@ -258,6 +256,7 @@ export class Visualizations {
       return
     }
     this.doc.transact(() => {
+      inner.delete(VIS_SLOT_FIELDS.failure)
       inner.set(VIS_SLOT_FIELDS.response, bytes)
       inner.set(VIS_SLOT_FIELDS.status, 'ready' satisfies VisSlotStatus)
     })
@@ -281,8 +280,26 @@ export class Visualizations {
       return
     }
     this.doc.transact(() => {
+      inner.delete(VIS_SLOT_FIELDS.response)
       inner.set(VIS_SLOT_FIELDS.failure, failure)
       inner.set(VIS_SLOT_FIELDS.status, 'failed' satisfies VisSlotStatus)
     })
   }
 }
+
+/*
+ * Note [A Persistent Attach Recovers]
+ * ===================================
+ * The runtime keeps a persistent visualization attached when one evaluation
+ * fails: the next time the node computes, it sends a new update. So a
+ * persistent slot moves freely between `ready` and `failed`, each answer
+ * replacing the last (`recordResponse` drops the failure, `recordFailure` the
+ * response). When `failed` was terminal for every slot, a node that panicked
+ * and was then fixed kept its visualization on the old error: the table showed
+ * "No Rows To Show" until its type was switched, which makes a new slot.
+ *
+ * The failure arrives on the control channel and the data on the data
+ * channel, so a late answer of an earlier evaluation can still replace a newer
+ * one; the node's next evaluation corrects it. A one-shot `inFrame` slot has
+ * only one answer, so its first `ready` or `failed` is final.
+ */
