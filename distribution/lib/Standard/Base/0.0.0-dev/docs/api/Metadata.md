@@ -30,8 +30,6 @@
     - Time_Input
     - Union kinds:(Standard.Base.Data.Vector.Vector Standard.Base.Any.Any) include_nothing:Standard.Base.Data.Boolean.Boolean=
     - Vector_Editor item_editor:Standard.Base.Metadata.Widget item_default:Standard.Base.Data.Text.Text
-    - add_source builder:Standard.Base.Any.Any source:Standard.Base.Any.Any -> Standard.Base.Nothing.Nothing
-    - collect_choice_sources values:Standard.Base.Any.Any builder:Standard.Base.Any.Any -> Standard.Base.Nothing.Nothing
     - collect_column_sources self builder:Standard.Base.Any.Any -> Standard.Base.Nothing.Nothing
     - column_sources self -> (Standard.Base.Data.Vector.Vector Standard.Base.Any.Any)
     - nested_resolver_error -> Standard.Base.Any.Any

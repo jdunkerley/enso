@@ -1,7 +1,7 @@
 from Standard.Base import all
+import Standard.Base.Metadata.Column_Kind.Column_Kind
 
 import Standard.Visualization.Internal.Names
-import Standard.Base.Metadata.Column_Kind.Column_Kind
 from Standard.Visualization.Viz_Column_Kind import Viz_Column_Kind
 from Standard.Visualization.Viz_Table import Viz_Table, Viz_Header, Viz_Unsupported
 

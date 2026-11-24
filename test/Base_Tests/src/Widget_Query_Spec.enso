@@ -8,7 +8,7 @@ import Standard.Base.Metadata.Column_Kind.Column_Kind
 import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 import Standard.Base.Metadata.Widget_Query
-from Standard.Base.Metadata.Widget_Query import Argument_Result, Widget_Method
+from Standard.Base.Metadata.Widget_Query import Argument_Result, Widget_Failure, Widget_Method
 
 from Standard.Test import all
 
@@ -480,6 +480,10 @@ add_specs suite_builder =
             inputs = "columns inputs " + Random.uuid
             method = Widget_Method.Value spec_module spec_module+".Fake_Table" "pick"
             Widget_Query.columns_json [Nothing, "other"] Panicky_Table.Value mock_cache method inputs . should_equal ',"columns":{"other":{"names":["X"],"kinds":["Other"],"type_names":[""]}}'
+            # The failure was logged: logging it again is refused as a repeat.
+            message = (Illegal_State.Error "conversion boom").to_display_text
+            failure = Widget_Failure.Value method "columns" "columns" message [] []
+            Widget_Query.log_failure failure inputs . should_be_false
 
     suite_builder.group "LogOnce" group_builder->
         group_builder.specify "is true only the first time it sees a key" <|

@@ -57,6 +57,15 @@ add_specs suite_builder =
             twice = Widget.Single_Choice [Choice.Option "A" "..A" [["x", Widget.Column_Name from="right"], ["y", Widget.Column_Name from="right"]]]
             twice.column_sources . should_equal ["right"]
 
+        group_builder.specify "column_sources looks into a choice whose value is a nested list of choices" <|
+            inner = [Choice.Option "Left" "..Left" [["column", Widget.Column_Name from="left"]], Choice.Option "Plain" "..Plain"]
+            outer = Widget.Single_Choice [Choice.Option "Group" inner [["key", Widget.Column_Name]]]
+            outer.column_sources . should_equal [Nothing, "left"]
+
+        group_builder.specify "column_sources reads the from of a Column_Vector" <|
+            (Widget.Column_Vector from="right").column_sources . should_equal ["right"]
+            Widget.Column_Vector.column_sources . should_equal [Nothing]
+
         group_builder.specify "column_sources looks into the kinds of a Union" <|
             union = Widget.Union [Pair.new "Text" Widget.Text_Input, Pair.new "Column" (Widget.Column_Name from="right")] include_nothing=True
             union.column_sources . should_equal ["right"]
