@@ -36,13 +36,55 @@ export function useCompletionData(
     ...valueOptionsStartingWithIdentifier.value,
     ...columnOptions.value.map(encloseBrackets),
   ])
+  const methodsByName = computed(
+    () => new Map((methods?.() ?? []).map((method) => [method.name, method])),
+  )
+  /** The values to offer for an argument of a function, from its `tagValues`. */
+  function argumentOptions(functionName: string, argIndex: number): Completion[] {
+    const method = methodsByName.value.get(functionName)
+    if (method == null) return []
+    return getArgumentOptions(method.documentation, argIndex)
+  }
   return {
     valueOptions,
+    argumentOptions,
     valueOptionsStartingWithIdentifier,
     methodOptions,
     columnOptions,
     columnsWithBracket,
   }
+}
+
+/**
+ * Values an argument's type offers that make no sense in an expression, by function. Casting to
+ * `..Null` or `..Unsupported_Data_Type` only fails.
+ */
+const EXCLUDED_ARGUMENT_VALUES: Partial<Record<string, ReadonlySet<string>>> = {
+  cast: new Set(['..Null', '..Unsupported_Data_Type']),
+}
+
+/**
+ * The expression's arguments map onto the method's: a column method's first argument is `self`,
+ * the column, just as it is the expression's first argument. A static function from
+ * `Expression_Statics` takes no column, so a `self` it lists is skipped.
+ *
+ * Only `..Name` values and booleans are offered: other tag values are Enso code, which the
+ * expression language cannot express.
+ */
+function getArgumentOptions(entry: MethodSuggestionEntry, argIndex: number): Completion[] {
+  const skipSelf = entry.selfType == null && entry.arguments[0]?.name === 'self'
+  const argument = entry.arguments[argIndex + (skipSelf ? 1 : 0)]
+  const excluded = EXCLUDED_ARGUMENT_VALUES[entry.name]
+  const options: Completion[] = []
+  for (const tag of argument?.tagValues ?? []) {
+    if (excluded?.has(tag)) continue
+    if (/^\.\.\w+$/.test(tag)) {
+      options.push({ label: tag, type: 'enum', boost: 2 })
+    } else if (tag === 'True' || tag === 'False') {
+      options.push({ label: tag.toLowerCase(), type: 'keyword', boost: 2 })
+    }
+  }
+  return options
 }
 
 /** Prefix operators that don't correspond to any method. */

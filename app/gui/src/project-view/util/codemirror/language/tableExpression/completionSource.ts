@@ -17,6 +17,7 @@ export function completionSource(
 ): CompletionSource {
   const {
     valueOptions,
+    argumentOptions,
     valueOptionsStartingWithIdentifier,
     methodOptions,
     columnOptions,
@@ -26,6 +27,12 @@ export function completionSource(
     const completion = completionTypeAt(context.pos, context.state)
     if (!completion) return null
     if (completion.auto === false && !context.explicit) return null
+    if (completion.type === 'functionInfo') {
+      if (completion.argValueFrom == null) return null
+      const options = argumentOptions(completion.functionName, completion.argIndex)
+      if (options.length === 0) return null
+      return { from: completion.argValueFrom, options, validFor: /^(\.\.?\w*)?$/ }
+    }
     const options =
       completion.type === 'value' ? valueOptions.value
       : completion.type === 'functionName' ?

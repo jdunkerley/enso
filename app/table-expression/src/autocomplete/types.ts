@@ -23,6 +23,14 @@ export interface FunctionInfoCompletion extends AnyCompletion {
   type: 'functionInfo'
   pos: number
   functionName: string
+  /** The argument the cursor is in, counting from 0. */
+  argIndex: number
+  /**
+   * Where a value for that argument starts, when the cursor is where one could be offered: in an
+   * empty argument, or at the end of a `..Name` being typed. Undefined anywhere else in the
+   * argument.
+   */
+  argValueFrom: number | undefined
 }
 
 export interface ValueCompletion extends AnyCompletion {

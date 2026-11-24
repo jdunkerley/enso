@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [Table expressions suggest the values an argument takes: typing
+  `cast([Value], ..` lists the value types to cast to.][941]
 - [Widgets that depend on other arguments (join conditions, filter values,
   column formats) update only when those arguments change, show a loading marker
   when slow, and fall back to the type's own widget when an input has an error.
@@ -615,6 +617,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [940]: https://github.com/jdunkerley/enso/pull/940
+[941]: https://github.com/jdunkerley/enso/pull/941
 [933]: https://github.com/jdunkerley/enso/pull/933
 [926]: https://github.com/jdunkerley/enso/pull/926
 [917]: https://github.com/jdunkerley/enso/pull/917
