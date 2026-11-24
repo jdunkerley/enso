@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Errors.Common.No_Such_Conversion
+import Standard.Base.Metadata.Column_Kind.Column_Kind
 
 from Standard.Table import Table
 import Standard.Database.Connection.Database
@@ -9,7 +10,6 @@ import Standard.Visualization.Id.Id
 import Standard.Visualization.Preprocessor
 from Standard.Visualization.SQL_Viz import SQL_Viz
 from Standard.Visualization.Viz_Cell import Viz_Cell
-import Standard.Base.Metadata.Column_Kind.Column_Kind
 from Standard.Visualization.Viz_Table import Viz_Table
 
 from Standard.Test import all

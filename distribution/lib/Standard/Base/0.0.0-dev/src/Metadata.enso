@@ -289,33 +289,15 @@ type Widget
        Appends the sources of the pickers in this widget to the builder, each
        once.
     collect_column_sources self builder -> Nothing = case self of
-        Widget.Column_Name _ source _ _ _ _ -> Widget.add_source builder source
-        Widget.Column_Names _ source _ _ -> Widget.add_source builder source
-        Widget.Column_Vector _ source -> Widget.add_source builder source
-        Widget.Order_By source _ -> Widget.add_source builder source
-        Widget.Single_Choice values _ -> Widget.collect_choice_sources values builder
-        Widget.Multiple_Choice values _ -> Widget.collect_choice_sources values builder
+        Widget.Column_Name _ source _ _ _ _ -> add_source builder source
+        Widget.Column_Names _ source _ _ -> add_source builder source
+        Widget.Column_Vector _ source -> add_source builder source
+        Widget.Order_By source _ -> add_source builder source
+        Widget.Single_Choice values _ -> collect_choice_sources values builder
+        Widget.Multiple_Choice values _ -> collect_choice_sources values builder
         Widget.Vector_Editor item_editor _ -> item_editor.collect_column_sources builder
         Widget.Union kinds _ -> kinds.each pair-> pair.second.collect_column_sources builder
         _ -> Nothing
-
-    ## ---
-       private: true
-       ---
-    collect_choice_sources values builder -> Nothing =
-        values.each choice->
-            choice.parameters.each pair-> pair.second.collect_column_sources builder
-            case choice.value of
-                nested : Vector -> Widget.collect_choice_sources nested builder
-                _ -> Nothing
-
-    ## ---
-       private: true
-       ---
-       Appends the source unless the builder already holds it.
-    add_source builder source -> Nothing =
-        seen = 0.up_to builder.length . any i-> builder.at i == source
-        if seen.not then builder.append source
 
     ## ---
        private: true
@@ -451,3 +433,17 @@ Widget.from (that : Enso_Secret.type) -> Widget =
 Widget.from (that : Regex.type) -> Widget =
     _ = that
     Widget.Regex_Input
+
+## Appends the sources of the column pickers in the parameters of the choices
+   to the builder, looking into nested choices.
+private collect_choice_sources values builder -> Nothing =
+    values.each choice->
+        choice.parameters.each pair-> pair.second.collect_column_sources builder
+        case choice.value of
+            nested : Vector -> collect_choice_sources nested builder
+            _ -> Nothing
+
+## Appends the source unless the builder already holds it.
+private add_source builder source -> Nothing =
+    seen = 0.up_to builder.length . any i-> builder.at i == source
+    if seen.not then builder.append source

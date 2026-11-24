@@ -281,6 +281,13 @@ add_specs suite_builder =
             t2 = t1.set (t1.at "a" + 1) as="a"
             (Widget_Columns.from t1) . should_equal (Widget_Columns.from t2)
 
+        group_builder.specify "a recomputed table with a changed schema converts unequal" <|
+            t1 = Table.new [["a", [1]], ["b", ["x"]]]
+            retyped = t1.set (t1.at "a" . cast Value_Type.Char) as="a"
+            (Widget_Columns.from t1) . should_not_equal (Widget_Columns.from retyped)
+            added = t1.set (t1.at "a" + 1) as="c"
+            (Widget_Columns.from t1) . should_not_equal (Widget_Columns.from added)
+
     suite_builder.group "Widget_Query.resolve_call on a Table" group_builder->
         group_builder.specify "a Table's answer carries its columns once" <|
             t = Table.new [["a", [1]], ["b", ["x"]]]

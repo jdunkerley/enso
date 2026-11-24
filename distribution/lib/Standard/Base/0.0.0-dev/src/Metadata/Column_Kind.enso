@@ -1,6 +1,4 @@
 import project.Any.Any
-import project.Data.Numbers.Float
-import project.Data.Numbers.Integer
 import project.Data.Numbers.Number
 import project.Data.Text.Text
 import project.Data.Time.Date.Date
@@ -41,8 +39,6 @@ type Column_Kind
        The kind of one value held in memory; `Nothing` is `Other`.
     of_value value -> Column_Kind =
         case value of
-            _ : Integer -> Column_Kind.Numeric
-            _ : Float -> Column_Kind.Numeric
             _ : Number -> Column_Kind.Numeric
             _ : Text -> Column_Kind.Textual
             _ : Boolean -> Column_Kind.Logical
