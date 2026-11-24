@@ -16,7 +16,14 @@ check_default typ =
     widget = Widget.from typ
     widget.should_be_a Widget
     type_name = Meta.meta typ . qualified_name
-    Widget_Query.resolve_type type_name . should_equal ('{"widget":' + widget.to_json + '}')
+    answer = Widget_Query.resolve_type type_name
+    without_clock answer . should_equal (without_clock ('{"widget":' + widget.to_json + '}'))
+
+## The "any value" choices (`make_any_selector`) default a date or time to the
+   current one, so two widgets built a second apart differ there. Replace those
+   values with a placeholder before comparing.
+without_clock json:Text -> Text =
+    json.replace (Regex.compile "\((Date|Time_Of_Day|Date_Time)\.new[0-9 ]*\)") "(<now>)"
 
 add_specs suite_builder =
     suite_builder.group "Type defaults by conversion" group_builder->
@@ -34,6 +41,11 @@ add_specs suite_builder =
         group_builder.specify "File_Format" <| check_default File_Format
         group_builder.specify "Filter_Condition" <| check_default Filter_Condition
         group_builder.specify "Index_Sub_Range" <| check_default Index_Sub_Range
+        group_builder.specify "the comparison ignores the current date and time in a widget" <|
+            a = '{"value":"(Date_Time.new 2026 11 24 20 41 58)","t":"(Time_Of_Day.new 9 5 1)","d":"(Date.new 2026 11 24)"}'
+            b = '{"value":"(Date_Time.new 2026 11 24 20 41 59)","t":"(Time_Of_Day.new 9 5 2)","d":"(Date.new 2026 11 25)"}'
+            without_clock a . should_equal (without_clock b)
+            without_clock a . should_not_contain "2026"
         group_builder.specify "Filter_Condition takes its options as extra arguments" <|
             all = Widget.from Filter_Condition
             fewer = Widget.from Filter_Condition include_text=False include_boolean=False
