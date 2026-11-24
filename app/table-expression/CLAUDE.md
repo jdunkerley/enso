@@ -15,3 +15,13 @@ into a CodeMirror `LanguageSupport`.
 Keep this grammar minimal. If a new syntactic construct is needed here and the
 full Enso parser already supports it, prefer consuming the Rust parser (via
 `rust-ffi` / `ydoc-shared/ast`) rather than duplicating grammar logic.
+
+## Autocomplete
+
+`src/autocomplete/` tells the GUI what to offer at the cursor
+(`completionTypeAt`). Inside a call's parentheses it answers `functionInfo` with
+the argument index and, when the cursor is in an empty argument or at the end of
+a `..Name`, where a value would start (`argumentAt` in `arguments.ts`, which
+counts commas in the text so that a half-typed call still works). The GUI's
+`completionSource.ts` offers that argument's `tagValues` there
+(`cast([Value], ..Ch` lists the `Value_Type`s).

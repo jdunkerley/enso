@@ -1,7 +1,9 @@
 import { ensureSyntaxTree, syntaxTree } from '@codemirror/language'
-import type { EditorState } from '@codemirror/state'
+import type { EditorState, Text } from '@codemirror/state'
+import type { SyntaxNode, Tree } from '@lezer/common'
+import { argumentAt } from './arguments'
 import { parseNode } from './syntax'
-import type { CompletionType } from './types'
+import type { CompletionType, FunctionInfoCompletion } from './types'
 
 const INITIAL_COMPLETION_TYPE: CompletionType = {
   type: 'value',
@@ -17,6 +19,8 @@ export function completionTypeAt(pos: number, state: EditorState): CompletionTyp
   // `a_function(1, 2, 3|)` was once reported as a binop. Expressions here are one short line, so
   // finish the parse rather than answer from part of it.
   const tree = ensureSyntaxTree(state, doc.length, Infinity) ?? syntaxTree(state)
+  const inAtom = atomArgumentAt(pos, tree, doc)
+  if (inAtom) return inAtom
   const cursor = tree.cursorAt(pos, 1)
   if (LEAFS_IGNORED_TO_RIGHT_OF_CURSOR.includes(cursor.name)) cursor.parent()
   let node = parseNode(cursor)
@@ -49,7 +53,7 @@ export function completionTypeAt(pos: number, state: EditorState): CompletionTyp
     const { name, open } = node
     return pos <= name.to ?
         { type: 'functionName', pos: name.from, auto: pos === name.to, insertDelim: open == null }
-      : { type: 'functionInfo', pos: name.from, functionName: doc.sliceString(name.from, name.to) }
+      : functionInfo(doc, name, open?.to ?? name.to, pos)
   } else if (node.type === 'Column') {
     const { name, close } = node
     return {
@@ -77,6 +81,35 @@ export function completionTypeAt(pos: number, state: EditorState): CompletionTyp
   } else {
     return null
   }
+}
+
+function functionInfo(
+  doc: Text,
+  name: { from: number; to: number },
+  argsFrom: number,
+  pos: number,
+): FunctionInfoCompletion {
+  return {
+    type: 'functionInfo',
+    pos: name.from,
+    functionName: doc.sliceString(name.from, name.to),
+    ...argumentAt(doc.toString(), argsFrom, pos),
+  }
+}
+
+/**
+ * While a `..Name` is being typed as an argument, the parser may not see the call around it yet
+ * (`cast([Value], ..Ch` has no closing parenthesis), so look for the call from the cursor outwards.
+ */
+function atomArgumentAt(pos: number, tree: Tree, doc: Text): FunctionInfoCompletion | null {
+  if (!/(^|[(,\s])\.\.?\w*$/.test(doc.sliceString(Math.max(0, pos - 100), pos))) return null
+  for (let node: SyntaxNode | null = tree.resolveInner(pos, -1); node; node = node.parent) {
+    if (node.name !== 'Function') continue
+    const open = node.getChild('OpenParen')
+    if (open == null || open.to > pos) continue
+    return functionInfo(doc, { from: node.from, to: open.from }, open.to, pos)
+  }
+  return null
 }
 
 const LEAFS_IGNORED_TO_RIGHT_OF_CURSOR = [
