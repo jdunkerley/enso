@@ -15,6 +15,7 @@ Utility binaries and scripts that aid engine/GUI development. **Not** a catch-al
 - `legal-review/`, `legal-review-helper/` — Third-party dependency license-review inputs and helpers.
 - `simple-library-server/` — Minimal HTTP library-server stub for testing the library download flow without touching the real library repository.
 - `wsl/` — `enso-toolchain.sh`, the script a WSL command sources to get the pinned GraalVM, sbt, GraalPy, Node and Rust (copied to `~/.enso-toolchain.sh`); its CLAUDE.md says how to install the toolchain it looks for.
+- `stdlib-dev/` — `stdlib-dev.ps1`, which links a checkout's standard library sources into the installed IDE as local libraries, so a docs or widget change is seen after a ~10 s compile and a project reopen; its CLAUDE.md has the loop.
 - `standby-preload/` — `generate.mjs`, which turns a `-Xlog:class+load` log of a Language Server boot into the standby engine's preload list (`engine/runner`, "Standby mode").
 
 ## Conventions
