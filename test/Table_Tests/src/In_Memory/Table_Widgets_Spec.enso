@@ -286,9 +286,27 @@ add_specs suite_builder =
             expect = answer "filter" (Widget_Helpers.make_filter_condition_selector mock_table) (subject_columns mock_table) (resolver_of ["self", "column"])
             without_clock (Widget_Query.resolve_call mock_table table_module table_type "filter" ["filter"]) . should_equal (without_clock expect)
 
-        group_builder.specify "join offers a spatial group when the table is a Spatial_Table" pending="The builder asks `table.is_a Spatial_Table`, but its `table:Table` argument has already unwrapped a Spatial_Table, and a Table is never one: the group is never offered." <|
-            widget = Widget_Helpers.make_join_condition_selector (Spatial_Table.from mock_table) right=mock_table
-            (widget.item_editor.values.map .label) . should_contain "Spatial"
+        group_builder.specify "join offers a spatial group when the table is a Spatial_Table (#954)" <|
+            spatial = Spatial_Table.from mock_table
+            labels widget = widget.item_editor.values.map .label
+            ## `right` not chosen yet, or spatial as well: the group is offered.
+            labels (Widget_Helpers.make_join_condition_selector spatial) . should_contain "Spatial"
+            labels (Widget_Helpers.make_join_condition_selector spatial right=spatial) . should_contain "Spatial"
+            widget = Widget_Helpers.make_join_condition_selector spatial right=spatial
+            ## Its pickers still name the subject and the `right` table.
+            spatial_option = widget.item_editor.values.find o-> o.label == "Spatial"
+            spatial_option.value.map .label . should_equal ["Intersect", "Contains", "Contains_Properly", "Within", "Overlaps", "Touches", "Crosses", "Covers", "Covered_By"]
+            spatial_option.value.first.parameters . should_equal [["left", Widget.Column_Name], ["right", Widget.Column_Name from="right"]]
+            widget.item_default . should_equal "(..Equals 'A')"
+
+        group_builder.specify "join does not offer the spatial group unless both tables are spatial (#954)" <|
+            spatial = Spatial_Table.from mock_table
+            labels widget = widget.item_editor.values.map .label
+            labels (Widget_Helpers.make_join_condition_selector mock_table) . should_not_contain "Spatial"
+            labels (Widget_Helpers.make_join_condition_selector mock_table right=mock_table) . should_not_contain "Spatial"
+            labels (Widget_Helpers.make_join_condition_selector mock_table right=spatial) . should_not_contain "Spatial"
+            labels (Widget_Helpers.make_join_condition_selector spatial right=mock_table) . should_not_contain "Spatial"
+            labels (Widget_Helpers.make_join_condition_selector spatial right=mock_table) . should_equal ["Equals", "Equals (Ignore Case)", "Between"]
 
     suite_builder.group "Widget_Columns.from caches per type, not per name" group_builder->
         group_builder.specify "a table of many types answers each column's own kind and type name" <|

@@ -219,7 +219,13 @@ make_filter_condition_selector table (column = Nothing) -> Widget =
    argument. The pickers name the call's subject (and `from="right"`), not the
    `table` passed in; `table` only decides whether spatial conditions are
    offered, and `right` whether its columns can be picked.
-make_join_condition_selector table:Table (right = Nothing) -> Widget =
+
+   The spatial conditions are offered when `table` is a `Spatial_Table` and
+   `right` is either not chosen yet or a `Spatial_Table` too (`join` rejects a
+   spatial condition unless both sides are spatial). `table` is left untyped:
+   ascribing `table:Table` converts a `Spatial_Table` back to a plain `Table`,
+   which is never a `Spatial_Table`, so the group was never offered.
+make_join_condition_selector table (right = Nothing) -> Widget =
     self_selector = Widget.Column_Name
     right_selector = if right.is_nothing then Text_Input else
         Widget.Column_Name from="right"
@@ -232,10 +238,11 @@ make_join_condition_selector table:Table (right = Nothing) -> Widget =
     between = Option "Between" "..Between" [["left", self_selector], ["right_lower", right_selector], ["right_upper", right_selector]]
     names=[equals, equals_ci, between]
 
-    spatial = if table.is_a Spatial_Table then [Spatial_Join_Condition.widget_option self_selector right_selector] else []
+    both_spatial = table.is_a Spatial_Table && (right.is_nothing || right.is_a Spatial_Table)
+    spatial = if both_spatial then [Spatial_Join_Condition.widget_option self_selector right_selector] else []
 
     item_editor = Single_Choice values=names+spatial
-    first_name = (table.at 0).name
+    first_name = (table:Table).at 0 . name
     Vector_Editor item_editor=item_editor item_default="(..Equals "+first_name.pretty+")"
 
 ## ---

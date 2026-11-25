@@ -499,6 +499,7 @@ type Spatial_Table
        ## Returns
        A new table with the existing columns and a new column containing the
        concave-hull spatial objects.
+    @column (Widget.Column_Name kinds=[Column_Kind.Other] expression=True)
     st_concave_hull self (column : Column | Expression | Text | Integer = _default_if_single self) as:Text="" ratio:Float=0.0 allow_holes:Boolean=False =
         resolved = _resolve_column column self.parent
         (self:Table).implementation.spatial_concave_hull self.parent.underlying resolved as ratio allow_holes
