@@ -80,9 +80,11 @@ export interface DropdownEntry {
         >
           <SvgIcon v-if="entry.icon" :name="entry.icon" class="menu-icon" />
           <span class="itemContent" v-text="entry.value"></span>
+          <!-- Not part of the entry's accessible name, which stays its value (the column's name). -->
           <span
             v-if="entry.detail"
             class="itemDetail"
+            aria-hidden="true"
             :title="entry.detail"
             v-text="entry.detail"
           ></span>

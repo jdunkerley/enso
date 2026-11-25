@@ -2968,6 +2968,10 @@ test.describe('Column pickers', () => {
     await expect(dropDown.item('Price').locator('.itemDetail')).toHaveText('Decimal (38, 10)')
     // A column whose type is not known has no type shown.
     await expect(dropDown.item('Notes').locator('.itemDetail')).toHaveCount(0)
+    // The type is not part of the entry's accessible name: it is still the column's name.
+    await expect(
+      dropDown.dropDown.getByRole('button', { name: 'Price', exact: true }),
+    ).toBeVisible()
     await dropDown.clickOption('Price')
     expect(await moduleCode(page)).toContain("lone = Data.lone_column 'Price'\n")
   })

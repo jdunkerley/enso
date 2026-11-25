@@ -20,6 +20,8 @@ test("an entry's detail is drawn after its value, with the full text as its titl
   expect(detail.attributes('title')).toBe('Decimal (38, 10)')
   // The detail follows the value, so it sits at the right.
   expect(items[0]!.element.lastElementChild).toBe(detail.element)
+  // It is kept out of the entry's accessible name, which stays the value alone.
+  expect(detail.attributes('aria-hidden')).toBe('true')
 })
 
 test('an entry without a detail has none', () => {
