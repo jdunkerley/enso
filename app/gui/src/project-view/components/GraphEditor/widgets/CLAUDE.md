@@ -362,9 +362,10 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
   `WidgetKindPicker/kindChipKey.ts`), and `WidgetArgumentName` draws it between
   the name and the value (and leaves the value out while it is the `Nothing ▼`
   button). Elsewhere (a vector item, an operand) the picker draws the chip in
-  front of its inner widget. Arrow keys move in the list (in `KindChip`, not in
-  `DropdownWidget`); Enter chooses. Switching writes the kind's default code and
-  its imports in one edit.
+  front of its inner widget. Arrow keys move in the list (`KindChip` moves the
+  focus; it does not use `DropdownWidget`'s `keyboard` mode, which the selection
+  menus use); Enter chooses. Switching writes the kind's default code and its
+  imports in one edit.
 - **Priority 44**: before `WidgetAnyToTarget` (45), `WidgetFileBrowser` (49),
   `WidgetSelection` (50), the date and time pickers and `WidgetRegex` (102),
   which draw the chosen kind inside it: a `Union` configuration must reach the
