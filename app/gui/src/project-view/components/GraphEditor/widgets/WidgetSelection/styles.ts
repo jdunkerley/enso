@@ -106,3 +106,25 @@ export function pickerMenuStyles(
     whileElementsMounted: autoUpdate,
   })
 }
+
+/**
+ * Positioning for a list that is as long as its entries (the kind picker's): placed as
+ * {@link pickerMenuStyles} places a menu, and `onAvailableHeight` is told the height left below
+ * the anchor, in screen pixels, so the list can stop there and scroll. Its `size` middleware only
+ * reads; it sets no width (see `pickerMenuStyles`).
+ */
+export function listMenuStyles(
+  floatReference: Ref<Opt<HTMLElement>>,
+  menuElement: Ref<Opt<HTMLElement>>,
+  onAvailableHeight: (height: number) => void,
+) {
+  return useFloating(floatReference, menuElement, {
+    placement: 'bottom-start',
+    middleware: [
+      offset(offsetSubmenu(true)),
+      shift(),
+      size({ apply: ({ availableHeight }) => onAvailableHeight(availableHeight) }),
+    ],
+    whileElementsMounted: autoUpdate,
+  })
+}

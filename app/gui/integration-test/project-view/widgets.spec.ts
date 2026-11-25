@@ -8,13 +8,14 @@ import {
   restoreMockWidgetConfigurations,
   setMockMainFile,
   setMockResolverAnswer,
+  setMockTypeDefaultDelay,
   typeDefaultQueryCount,
   widgetQueriesOf,
   widgetQueryCount,
   type MockWidgetQuery,
 } from 'integration-test/mock/lsHandler'
 import * as actions from './actions'
-import { mockMethodCallInfo } from './expressionUpdates'
+import { mockExpressionUpdate, mockMethodCallInfo } from './expressionUpdates'
 import * as locate from './locate'
 
 class DropDownLocator {
@@ -2327,6 +2328,39 @@ test.describe('Type defaults from the library', () => {
     expect(typeDefaultQueryCount('Standard.Base.Data.Numbers.Integer')).toBe(1)
   })
 
+  // Spec §6: a method's argument types are asked when it is first shown, so a node placed from the
+  // component browser does not show its bare argument name for one more engine round trip.
+  test("the component browser asks the shown entry's argument types before the node is placed", async ({
+    editorPage,
+    page,
+  }) => {
+    const LOCALE = 'Standard.Base.Data.Locale.Locale'
+    // A slow engine: the answer must be asked for early to be there when the node's call is known.
+    setMockTypeDefaultDelay(500)
+    await editorPage.mockSuggestion(
+      staticMethod('pick_locale', {
+        name: 'locale',
+        reprType: LOCALE,
+        isSuspended: false,
+        hasDefault: false,
+      }),
+    )
+    // A computed frame to ask in.
+    await mockExpressionUpdate(page, 'first', {})
+    await locate.addNewNodeButton(page).click()
+    await locate.componentBrowserInput(page).fill('pick_loc')
+    await expect(locate.componentBrowserSelectedEntry(page)).toHaveText('Data.pick_locale')
+    await expect.poll(() => typeDefaultQueryCount(LOCALE)).toBe(1)
+    await page.keyboard.press('Enter')
+    await expect(locate.componentBrowser(page)).toBeHidden()
+    const node = locate.graphNode(page).filter({ hasText: 'pick_locale' })
+    const binding = (await node.locator('.binding').textContent())?.trim()
+    expect(binding).toBeTruthy()
+    await mockMethodCallInfo(page, binding!, pointer('pick_locale'))
+    await expect(node.locator('.WidgetSelection')).toHaveCount(1)
+    expect(typeDefaultQueryCount(LOCALE)).toBe(1)
+  })
+
   test("a nested call's date argument gets the picker", async ({ editorPage, page }) => {
     await editorPage
       .mockSuggestion(
@@ -2850,6 +2884,52 @@ test.describe('Kind picker', () => {
     await expect(node.locator('.WidgetKindPicker')).toHaveCount(0)
     await select(page, node)
     await expect(node.getByRole('button', { name: /change kind/ })).toHaveCount(0)
+  })
+
+  test('the list shows every kind of a long union, without scrolling', async ({
+    editorPage,
+    page,
+    localApi,
+  }) => {
+    const widget = (constructor: string, fields: object = {}) => ({
+      type: 'Widget',
+      constructor,
+      ...fields,
+    })
+    /* eslint-disable camelcase */
+    const kinds: [string, object][] = [
+      ['Integer', widget('Numeric_Input')],
+      ['Float', widget('Numeric_Input')],
+      ['Text', widget('Text_Input')],
+      ['Boolean', widget('Boolean_Input')],
+      ['Date', widget('Date_Input')],
+      ['Time_Of_Day', widget('Time_Input')],
+      ['Date_Time', widget('Date_Time_Input')],
+      ['Regex', widget('Regex_Input')],
+      ['Enso_Secret', widget('Secret_Browse')],
+      ['File', widget('File_Browse', { file_types: [] })],
+      ['Folder', widget('Folder_Browse')],
+    ]
+    const union = widget('Union', { kinds, include_nothing: true })
+    /* eslint-enable camelcase */
+    await editorPage.mockSuggestion(
+      unionMethod('annotated', `${INTEGER} | ${NOTHING}`, { annotations: ['value'] }),
+    )
+    await localApi.updateVisualization('.annotated', [['value', union]])
+    await mockMethodCallInfo(page, 'annot', {
+      methodPointer: { module: T, definedOnType: T, name: 'annotated' },
+      notAppliedArguments: [0],
+    })
+    const node = locate.graphNodeByBinding(page, 'annot')
+    await expect(node.locator('.kindIcon')).toHaveAttribute('title', 'Integer')
+    await select(page, node)
+    await changeKind(node, 'Integer').click()
+    await list(page).expectVisibleWithOptions([...kinds.map(([label]) => label), 'Nothing'])
+    // Twelve rows, where the dropdown's usual cap is about seven: the list is not cut short.
+    const scroller = page.locator('.DropdownWidget:not([data-transitioning]) .list')
+    await expect
+      .poll(() => scroller.evaluate((list) => list.scrollHeight - list.clientHeight))
+      .toBeLessThanOrEqual(0)
   })
 
   test('Vector (Text | Integer): every item has an icon and + adds an empty text', async ({

@@ -4,6 +4,13 @@
 
 - [Argument dropdowns can be used from the keyboard: the arrow keys move through
   the entries, also while typing to filter them, and Enter chooses one.][953]
+- [The list of kinds a union argument offers shows every kind without scrolling,
+  the kind icons sit on the text's baseline, the whole-number icon is redrawn to
+  read at small sizes, and a `regex '…'` value is outlined as one value
+  again.][950]
+- [A component placed from the component browser shows its arguments' widgets
+  (pickers, dropdowns) as soon as it appears, instead of showing the bare
+  argument names for a moment first.][952]
 - [Column dropdowns show each column's type beside its name.][949]
 - [Table expressions suggest the values an argument takes: typing
   `cast([Value], ..` lists the value types to cast to.][941]
@@ -625,6 +632,8 @@
 [949]: https://github.com/jdunkerley/enso/pull/949
 [940]: https://github.com/jdunkerley/enso/pull/940
 [941]: https://github.com/jdunkerley/enso/pull/941
+[950]: https://github.com/jdunkerley/enso/pull/950
+[952]: https://github.com/jdunkerley/enso/pull/952
 [951]: https://github.com/jdunkerley/enso/pull/951
 [933]: https://github.com/jdunkerley/enso/pull/933
 [926]: https://github.com/jdunkerley/enso/pull/926

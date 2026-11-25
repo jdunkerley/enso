@@ -134,6 +134,14 @@ render only its own slot content. The icon is already on the row, drawn by
     stale frames back off and are retried choosing a frame again. Until some
     frame executes, an un-annotated argument shows no widget; the first
     appearance of a type costs one round trip.
+  - **A method's argument types are asked before its arguments render** (spec
+    §6): `TypeDefaults.prefetch` starts the queries of the types not known or in
+    flight, reading nothing reactively. The component browser calls it for the
+    entry it shows (selected, or applied while its arguments are typed), so a
+    node placed from it has its widgets as soon as the engine names its call;
+    `useWidgetFunctionCallInfo` calls it once a call is known, for every
+    argument, the ones not shown included. One query per type: the engine's
+    `resolve_type` takes one.
 - `WidgetDate.vue` — a dropdown wrapper for an input configured `Date_Input`
   (vector items included) and for a whole node that is
   `Date.today`/`yesterday`/`tomorrow` or `Date.new` with any arguments
@@ -381,7 +389,14 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
   (`WidgetKindPicker/focusAfterSwitch.ts`): only the switched chip's (same node,
   kinds and chosen kind), and nothing waits when the button was kept. The
   picker's root does not stop Enter: its inner widgets handle Enter as they do
-  outside a union, and the chip and its list stop it themselves.
+  outside a union, and the chip and its list stop it themselves. **The list
+  shows every kind**, not the dropdown's usual 6.4 rows: it scrolls only when
+  the window below the button is shorter (`listMenuStyles` in
+  `WidgetSelection/styles.ts` reports the height left, which `KindChip` divides
+  by the graph's zoom). A kind without an icon (`Nothing`) has its label
+  indented to line up with the labels after the icons. The bare icon of an
+  unselected node is 1 px lower than the port's centre, so its glyph sits on the
+  baseline of the text beside it.
 - **Priority 44**: before `WidgetAnyToTarget` (45), `WidgetFileBrowser` (49),
   `WidgetSelection` (50), the date and time pickers and `WidgetRegex` (102),
   which draw the chosen kind inside it: a `Union` configuration must reach the
@@ -406,9 +421,10 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
 - `WidgetRegex.vue` (priority 102, after `WidgetArgumentName`, since it draws
   the call from its parts) is the input of a `Regex_Input` argument: `regex '…'`
   is drawn as the call's head (`regex`, `Regex.compile`, as written) with the
-  pattern edited in place by `WidgetText`; an unset argument is an empty input
-  that writes `regex '<text>'` on blur. A `Regex` argument outside a union with
-  `tagValues` of its own gets the values' dropdown (`WidgetSelection`, 50)
+  pattern edited in place by `WidgetText`, both inside the outline a call in an
+  argument has (`WidgetFunction`'s `.nestedCall`); an unset argument is an empty
+  input that writes `regex '<text>'` on blur. A `Regex` argument outside a union
+  with `tagValues` of its own gets the values' dropdown (`WidgetSelection`, 50)
   around the regex input, by D1 (#919): an argument's own `tagValues` win over a
   type default (`__tests__/regexSelection.test.ts`).
 

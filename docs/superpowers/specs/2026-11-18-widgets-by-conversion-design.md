@@ -493,3 +493,11 @@ in parallel. Each gets its own plan.
   every group D type before and after.
 - **The `…` menu and `selected`** rely on #850's behaviour; if #850 changes,
   §7's `selected` is redefined with it.
+
+## Known limitations
+
+- **An annotation cannot suppress a type default.** An annotation that answers
+  `{"widget":null}`, or fails, falls through to the next rule (§1: the GUI
+  "still offers the next rule's widget"), so the argument gets its type's
+  default widget. There is no way for a method to say "no widget here" when the
+  argument's type has one. No standard-library method needs it today (#914).
