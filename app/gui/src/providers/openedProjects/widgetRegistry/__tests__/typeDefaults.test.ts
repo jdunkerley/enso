@@ -574,3 +574,91 @@ test('the type name is written as an escaped text literal', async () => {
     `Standard.Base.Meta.call_module_method 'Standard.Base.Metadata.Widget_Query' 'resolve_type' [] '${DATE}'`,
   )
 })
+
+/* eslint-disable camelcase */
+const VECTOR = 'Standard.Base.Data.Vector.Vector'
+
+test('Text | Vector Text: the list kind takes Text items, is a type default, and is stable', async () => {
+  const query = vi.fn(answerFor({ [TEXT]: { widget: { constructor: 'Text_Input' } } }))
+  // An applied type has no `Widget.from`: only Text is asked.
+  const defaults = make((t) => t === TEXT, query)
+  const union = `${TEXT} | ${VECTOR} ${TEXT}`
+  expect(defaults.lookup(union, frameA)).toBeUndefined() // pending
+  await flushPromises()
+  const composed = defaults.lookup(union, frameA)
+  expect(composed).toEqual({
+    kind: 'Union',
+    kinds: [
+      { label: 'Text', config: { kind: 'Text_Input' } },
+      {
+        label: 'Vector Text',
+        config: { kind: 'Vector_Editor', item_editor: { kind: 'Text_Input' }, item_default: "''" },
+      },
+    ],
+  })
+  expect(query).toHaveBeenCalledTimes(1)
+  expect(defaults.lookup(union, frameA)).toBe(composed)
+  const listKind = composed?.kind === 'Union' ? composed.kinds[1]!.config : undefined
+  expect(isTypeDefault(listKind ?? undefined)).toBe(true)
+})
+
+test('a list of a type without a widget is no kind', async () => {
+  const defaults = make(
+    (t) => t === TEXT,
+    answerFor({ [TEXT]: { widget: { constructor: 'Text_Input' } } }),
+  )
+  const union = `${TEXT} | ${VECTOR} ${FILE}`
+  defaults.lookup(union, frameA)
+  await flushPromises()
+  expect(defaults.lookup(union, frameA)).toEqual({ kind: 'Text_Input' })
+})
+
+test('a list beside only Nothing composes as before', async () => {
+  const defaults = make(
+    () => true,
+    answerFor({ [TEXT]: { widget: { constructor: 'Text_Input' } } }),
+  )
+  const union = `${VECTOR} ${TEXT} | ${NOTHING}`
+  defaults.lookup(union, frameA)
+  await flushPromises()
+  expect(defaults.lookup(union, frameA)).toBeUndefined()
+})
+
+test("a list's new item is its item kind's default, a union element's first", async () => {
+  const defaults = make(
+    (t) => t === DATE || t === TEXT,
+    answerFor({
+      [DATE]: { widget: { constructor: 'Date_Input' } },
+      [TEXT]: { widget: { constructor: 'Text_Input' } },
+    }),
+  )
+  const union = `${TEXT} | ${VECTOR} (${DATE} | ${TEXT})`
+  defaults.lookup(union, frameA)
+  await flushPromises()
+  defaults.lookup(union, frameA)
+  await flushPromises()
+  expect(defaults.lookup(union, frameA)).toMatchObject({
+    kind: 'Union',
+    kinds: [
+      { label: 'Text' },
+      {
+        config: {
+          kind: 'Vector_Editor',
+          item_editor: { kind: 'Union', kinds: [{ label: 'Date' }, { label: 'Text' }] },
+          item_default: 'Date.today',
+        },
+      },
+    ],
+  })
+})
+
+test("prefetch asks a `Vector X` member's element types, not the applied type", () => {
+  const query = vi.fn<Query>().mockResolvedValue(WIDGET)
+  const defaults = make((type) => !type.startsWith(VECTOR), query)
+  defaults.prefetch([`${TEXT} | ${VECTOR} (${DATE} | ${INTEGER})`], frameA)
+  expect(query.mock.calls.map(([, code]) => code)).toEqual([
+    RESOLVE_TYPE_EXPRESSION(TEXT),
+    RESOLVE_TYPE_EXPRESSION(DATE),
+    RESOLVE_TYPE_EXPRESSION(INTEGER),
+  ])
+})

@@ -16,7 +16,7 @@ import {
   type KindChipProps,
 } from '@/components/GraphEditor/widgets/WidgetKindPicker/kindChipKey'
 import {
-  kindDefaultCode,
+  kindSwitchCode,
   matchKind,
 } from '@/components/GraphEditor/widgets/WidgetKindPicker/kindMatch'
 import { useKindImports } from '@/components/GraphEditor/widgets/WidgetKindPicker/kindImports'
@@ -60,9 +60,13 @@ const innerInput = computed<WidgetInput>(() => {
 
 const addKindImports = useKindImports()
 
-/** Write the kind's default code, with its imports, as one edit (one undo step). */
+/**
+ * Write the code of the switch to `kind` (its default code, or the value carried across, see
+ * `kindSwitchCode`), with its imports, as one edit (one undo step).
+ */
 function switchTo(kind: UnionKind) {
-  const code = kindDefaultCode(kind.config)
+  const from = chosenIndex.value != null ? kinds.value[chosenIndex.value]?.config : undefined
+  const code = kindSwitchCode(from, kind.config, valueAst(props.input))
   if (code == null) return
   module.value.edit((edit) => {
     addKindImports(edit, kind.config)

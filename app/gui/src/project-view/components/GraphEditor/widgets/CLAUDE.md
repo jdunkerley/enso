@@ -356,21 +356,29 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
   `composeUnion`, reached from `TypeDefaults.lookup`): `unionMembers` splits the
   declared type on top-level `|`; each member's type default is asked
   separately. `Nothing` is a kind of its own. A member with no widget is
-  dropped. **The conversion rule:** a member A is dropped when another member B
-  has `B.from (that : A)` (`convertsBetween`, read from the suggestion
-  database's `conversionSources`), but only when B itself has a widget (`URI`
-  absorbs nothing): `Text | File` is just a File (`File.from (that : Text)`),
-  while `Text | Regex` keeps both kinds (no `Regex.from (that : Text)` exists).
-  Conversions count through other members (A → B → C drops A and B), and of
-  members that all convert to each other (two, or a cycle of more) the earliest
-  stays; if every member would go the first stays. `Nothing` is never absorbed
-  and never absorbs. Members with deep-equal widgets collapse. Only
-  `Single_Choice` kinds merge into one `Single_Choice` (`Nothing` an option); a
-  single kind stays that widget; otherwise a `Union` with `Nothing` last. The
-  result is memoised per type while the member widgets and the conversion
-  verdicts are unchanged, so a conversion appearing later re-composes it. An
-  engine-built `Widget.Union` (and a `@` annotation) parse to the same `Union`
-  configuration.
+  dropped. **A `Vector X` member is a list kind** (a `Vector_Editor` whose items
+  take X's type default, built by `TypeDefaults.listKind`, itself a type
+  default: `WidgetVector` writes its new items as a plain `Vector X`'s), but
+  only beside another kind that is not a list (`Nothing` does not count):
+  `Text | Vector Text` offers both, while `Vector Text | Nothing` and
+  `Vector Text | Vector Integer` compose as if the lists were not there. X
+  without a widget gives no kind. A list neither absorbs nor is absorbed by a
+  conversion. GUI only: the engine has no `Widget.from` for an applied type
+  (owner's decision D3 on #919). **The conversion rule:** a member A is dropped
+  when another member B has `B.from (that : A)` (`convertsBetween`, read from
+  the suggestion database's `conversionSources`), but only when B itself has a
+  widget (`URI` absorbs nothing): `Text | File` is just a File
+  (`File.from (that : Text)`), while `Text | Regex` keeps both kinds (no
+  `Regex.from (that : Text)` exists). Conversions count through other members (A
+  → B → C drops A and B), and of members that all convert to each other (two, or
+  a cycle of more) the earliest stays; if every member would go the first stays.
+  `Nothing` is never absorbed and never absorbs. Members with deep-equal widgets
+  collapse. Only `Single_Choice` kinds merge into one `Single_Choice` (`Nothing`
+  an option); a single kind stays that widget; otherwise a `Union` with
+  `Nothing` last. The result is memoised per type while the member widgets and
+  the conversion verdicts are unchanged, so a conversion appearing later
+  re-composes it. An engine-built `Widget.Union` (and a `@` annotation) parse to
+  the same `Union` configuration.
 - **The look:** the icon of the kind the value is
   (`WidgetKindPicker/KindChip.vue`), directly in front of the value, which is
   drawn by that kind's own widget (the node still shows its code). On a selected
@@ -388,18 +396,22 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
   focus; it does not use `DropdownWidget`'s `keyboard` mode, which the selection
   menus use); Enter chooses. Switching writes the kind's default code and its
   imports in one edit (`WidgetKindPicker/kindImports.ts`, shared with a vector's
-  new item). After a switch the chip's new button takes the focus
-  (`WidgetKindPicker/focusAfterSwitch.ts`): only the switched chip's (same node,
-  kinds and chosen kind), and nothing waits when the button was kept. The
-  picker's root does not stop Enter: its inner widgets handle Enter as they do
-  outside a union, and the chip and its list stop it themselves. **The list
-  shows every kind**, not the dropdown's usual 6.4 rows: it scrolls only when
-  the window below the button is shorter (`listMenuStyles` in
-  `WidgetSelection/styles.ts` reports the height left, which `KindChip` divides
-  by the graph's zoom). A kind without an icon (`Nothing`) has its label
-  indented to line up with the labels after the icons. The bare icon of an
-  unselected node is 1 px lower than the port's centre, so its glyph sits on the
-  baseline of the text beside it.
+  new item), except two switches that carry the value across (`kindSwitchCode`,
+  `WidgetKindPicker/kindMatch.ts`): Text → a list whose items take it wraps it
+  (`'x'` → `['x']`), and a list → Text keeps a single text literal (`['a']` →
+  `'a'`) and otherwise writes `''`, lossy by the owner's choice. Only an
+  explicit switch converts; nothing else rewrites the value. After a switch the
+  chip's new button takes the focus (`WidgetKindPicker/focusAfterSwitch.ts`):
+  only the switched chip's (same node, kinds and chosen kind), and nothing waits
+  when the button was kept. The picker's root does not stop Enter: its inner
+  widgets handle Enter as they do outside a union, and the chip and its list
+  stop it themselves. **The list shows every kind**, not the dropdown's usual
+  6.4 rows: it scrolls only when the window below the button is shorter
+  (`listMenuStyles` in `WidgetSelection/styles.ts` reports the height left,
+  which `KindChip` divides by the graph's zoom). A kind without an icon
+  (`Nothing`) has its label indented to line up with the labels after the icons.
+  The bare icon of an unselected node is 1 px lower than the port's centre, so
+  its glyph sits on the baseline of the text beside it.
 - **Priority 44**: before `WidgetAnyToTarget` (45), `WidgetFileBrowser` (49),
   `WidgetSelection` (50), the date and time pickers and `WidgetRegex` (102),
   which draw the chosen kind inside it: a `Union` configuration must reach the

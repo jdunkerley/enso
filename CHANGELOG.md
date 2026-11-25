@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [An argument that takes a value or a list of them, such as
+  `Text | Vector Text`, offers the list as a kind of its own. Switching from a
+  text to the list wraps the text in a list, and switching back keeps a single
+  text.][960]
 - [Argument dropdowns can be used from the keyboard: the arrow keys move through
   the entries, also while typing to filter them, and Enter chooses one.][953]
 - [The list of kinds a union argument offers shows every kind without scrolling,
@@ -628,6 +632,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[960]: https://github.com/jdunkerley/enso/pull/960
 [953]: https://github.com/jdunkerley/enso/pull/953
 [949]: https://github.com/jdunkerley/enso/pull/949
 [940]: https://github.com/jdunkerley/enso/pull/940

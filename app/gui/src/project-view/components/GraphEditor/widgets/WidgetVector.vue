@@ -7,6 +7,7 @@ import {
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
 import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
+import { isTypeDefault } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import {
   defaultItemCode,
   vectorElementType,
@@ -67,15 +68,23 @@ const itemConfig = computed(() =>
 // would otherwise find the items' type default still unknown and write `_`.
 watchEffect(() => void itemConfig.value)
 
+/**
+ * Whether an annotation's `Vector_Editor` says what a new item is. The list kind of a `Vector X`
+ * union member is a type default: its items are written as a plain `Vector X`'s are, imports too.
+ */
+const annotatedEditor = computed(
+  () =>
+    props.input.dynamicConfig?.kind === 'Vector_Editor' &&
+    !isTypeDefault(props.input.dynamicConfig),
+)
+
 /** The kind a new item is written as, when no annotation's `item_default` says what to write. */
 const defaultItemKind = computed(() =>
-  props.input.dynamicConfig?.kind === 'Vector_Editor' ?
-    undefined
-  : vectorItemKind(itemConfig.value),
+  annotatedEditor.value ? undefined : vectorItemKind(itemConfig.value),
 )
 
 const defaultItem = computed(() => {
-  if (props.input.dynamicConfig?.kind === 'Vector_Editor')
+  if (annotatedEditor.value && props.input.dynamicConfig?.kind === 'Vector_Editor')
     return Ast.parseExpression(props.input.dynamicConfig.item_default) ?? DEFAULT_ITEM.value
   const typed =
     (defaultItemKind.value !== undefined ? kindDefaultCode(defaultItemKind.value) : undefined) ??

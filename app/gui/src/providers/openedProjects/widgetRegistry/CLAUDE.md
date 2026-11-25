@@ -25,16 +25,19 @@ how they choose and how a widget query runs).
 - `typeDefaults.ts` — `TypeDefaults`: a type's default widget
   (`Widget_Query.resolve_type`), asked once per type per session, retried with
   backoff, in a computed frame. `lookup` gives the static default (a union's
-  composed from its members'); `prefetch` starts the queries of a method's
-  argument types before they render (spec §6); `resolverDefault` the resolver of
-  a type whose default needs the call (group C: `Simple_Expression`,
-  `DuckDB_GeoFormat`, …), which the widget query then runs per call through
-  `type_defaults`. After `dispose` (the project closing) a query still in flight
-  records nothing and starts no retry. A frame that answers any type is no
-  longer avoided by the others' retries.
+  composed from its members'; a `Vector X` member's is a `Vector_Editor` of X's
+  default, built here, memoised per X and marked a type default); `prefetch`
+  starts the queries of a method's argument types before they render (spec §6);
+  `resolverDefault` the resolver of a type whose default needs the call (group
+  C: `Simple_Expression`, `DuckDB_GeoFormat`, …), which the widget query then
+  runs per call through `type_defaults`. After `dispose` (the project closing) a
+  query still in flight records nothing and starts no retry. A frame that
+  answers any type is no longer avoided by the others' retries.
 - `unionKinds.ts` — composing a declared union's widget from its members'
   (`composeUnion`), dropping a member another converts from (directly or through
-  other members; of a cycle of conversions the earliest member stays).
+  other members; of a cycle of conversions the earliest member stays). A `list`
+  member (`Vector X`) takes no part in conversions and is a kind only beside a
+  kind that is not a list.
 - `columnPickers.ts` — expanding a column picker reference from the answer's
   `columns` block; `SchemaCache` keeps the expansions per schema.
 - `widgetQueryPlan.ts` — pure: what a node's query sends after an answer (only

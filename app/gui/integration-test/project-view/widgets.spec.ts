@@ -2486,6 +2486,7 @@ test.describe('Kind picker', () => {
             '    dates = Data.vec_dates []',
             "    fsec = Data.file_secret (Enso_Secret.get 'pw')",
             "    fpath = Data.file_secret 'data.csv'",
+            "    textvec = Data.text_vec 'a'",
             '',
           ].join('\n'),
         ),
@@ -2973,6 +2974,46 @@ test.describe('Kind picker', () => {
     const files = new DropDownLocator(fileNode)
     await files.clickWidget()
     await files.expectVisibleWithOptions(CHOOSE_FILE_OPTIONS)
+  })
+
+  test('Text | Vector Text: the list is a kind; switching wraps and unwraps, one undo step each', async ({
+    editorPage,
+    page,
+  }) => {
+    const node = await kindNode(
+      editorPage,
+      page,
+      'textvec',
+      unionMethod('text_vec', `${TEXT} | ${T}.Vector.Vector ${TEXT}`),
+      true,
+    )
+    await expect(node.locator('.kindIcon')).toHaveAttribute('title', 'Text')
+    await select(page, node)
+    await changeKind(node, 'Text').click()
+    await list(page).expectVisibleWithOptions(['Text', 'Vector Text'])
+    // Text → Vector Text wraps the value.
+    await list(page).clickOption('Vector Text')
+    await expect(changeKind(node, 'Vector Text')).toBeVisible()
+    await expect(node.locator('.WidgetVector .item')).toHaveCount(1)
+    expect(await moduleCode(page)).toContain("textvec = Data.text_vec ['a']\n")
+    await page.keyboard.press('ControlOrMeta+Z')
+    await expect(changeKind(node, 'Text')).toBeVisible()
+    expect(await moduleCode(page)).toContain("textvec = Data.text_vec 'a'\n")
+    await page.keyboard.press('ControlOrMeta+Shift+Z')
+    await expect(changeKind(node, 'Vector Text')).toBeVisible()
+    expect(await moduleCode(page)).toContain("textvec = Data.text_vec ['a']\n")
+    // Vector Text → Text keeps the single text.
+    await changeKind(node, 'Vector Text').click()
+    // Not `clickOption`, which takes any item containing the text (Vector Text too).
+    await list(page)
+      .items.filter({ has: page.getByText('Text', { exact: true }) })
+      .click()
+    await expect(changeKind(node, 'Text')).toBeVisible()
+    await expect(node.getByTestId('widget-text-content')).toHaveText('a')
+    expect(await moduleCode(page)).toContain("textvec = Data.text_vec 'a'\n")
+    await page.keyboard.press('ControlOrMeta+Z')
+    await expect(changeKind(node, 'Vector Text')).toBeVisible()
+    expect(await moduleCode(page)).toContain("textvec = Data.text_vec ['a']\n")
   })
 
   test("Vector (Date | Text): + adds the first kind's default with its import, in one undo step", async ({
