@@ -1,0 +1,8 @@
+from Standard.Base import all
+
+## The "any value" choices of a column picker (`make_any_selector`) default a
+   date or time to the current one, so two widgets built a second apart differ
+   there. Replaces those values with a placeholder, so two widgets built at
+   different moments can be compared as text.
+without_clock json:Text -> Text =
+    json.replace (Regex.compile "\((Date|Time_Of_Day|Date_Time)\.new[0-9 ]*\)") "(<now>)"
