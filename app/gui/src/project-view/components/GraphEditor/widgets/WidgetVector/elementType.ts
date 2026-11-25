@@ -58,17 +58,21 @@ export function vectorItemConfig(
 }
 
 /**
- * The code a new item starts as, from the item widget's configuration: a union's first kind that
- * has one, else what the widget kind itself starts as.
+ * The kind whose default code a new item starts as, from the item widget's configuration: a
+ * union's first kind that has one (`null`: `Nothing`), else the configuration itself if it has one.
+ * Its imports go in with the item (`useKindImports`).
  */
-export function vectorItemDefault(config: WidgetConfiguration | undefined): string | undefined {
+export function vectorItemKind(
+  config: WidgetConfiguration | undefined,
+): WidgetConfiguration | null | undefined {
   if (config == null) return undefined
-  if (config.kind === 'Union') {
-    for (const kind of config.kinds) {
-      const code = kindDefaultCode(kind.config)
-      if (code != null) return code
-    }
-    return undefined
-  }
-  return kindDefaultCode(config)
+  if (config.kind === 'Union')
+    return config.kinds.find((kind) => kindDefaultCode(kind.config) != null)?.config
+  return kindDefaultCode(config) != null ? config : undefined
+}
+
+/** The code a new item starts as: the default code of {@link vectorItemKind}. */
+export function vectorItemDefault(config: WidgetConfiguration | undefined): string | undefined {
+  const kind = vectorItemKind(config)
+  return kind === undefined ? undefined : kindDefaultCode(kind)
 }

@@ -90,6 +90,11 @@ add_specs suite_builder =
             json.get "include_nothing" . should_be_false
             json.get "kinds" . first . first . should_equal "Locale"
 
+        group_builder.specify "a Union with no kinds but Nothing" <|
+            (Widget.Union [] include_nothing=True).to_json . should_equal '{"constructor":"Union","kinds":[],"include_nothing":true}'
+            (Widget.Union []).to_json . should_equal '{"constructor":"Union","kinds":[],"include_nothing":false}'
+            (Widget.Union [] include_nothing=True).column_sources . should_equal []
+
         group_builder.specify "a Regex_Input" <| Widget.Regex_Input.to_json . should_equal '{"constructor":"Regex_Input"}'
 
         group_builder.specify "a Union nests inside a Vector_Editor" <|

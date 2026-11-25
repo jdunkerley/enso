@@ -13,9 +13,9 @@ import org.enso.interpreter.runtime.data.text.Text;
 import org.enso.interpreter.runtime.data.vector.ArrayLikeHelpers;
 
 /**
- * The names of the parameters of exactly the method a module defines on a type (looked up as
- * {@link GetMethodAnnotationNode} looks it up), {@code self} excluded, in order. The widget query
- * checks a resolver's parameters against them.
+ * The names of the parameters of exactly the method a module defines on a type (looked up as {@link
+ * GetMethodAnnotationNode} looks it up), {@code self} excluded, in order. The widget query checks a
+ * resolver's parameters against them.
  */
 @BuiltinMethod(
     type = "Meta",

@@ -11,6 +11,8 @@ import {
   handleEngineLogStream,
   isEngineLogAppendRequest,
   isEngineLogStreamRequest,
+  MAX_APPEND_BYTES,
+  MAX_APPEND_DRAIN_BYTES,
   type AppendRequest,
   type EngineLogStreamOptions,
   type EventStreamRequest,
@@ -356,5 +358,51 @@ describe('handleEngineLogAppend aborts', () => {
     await handleEngineLogAppend(request, response, hub, {})
     expect(response.status).toBe(413)
     expect(response.headers.Connection).toBe('close')
+  })
+
+  test('an endless oversized body is drained only up to a bound, then the request is ended', async () => {
+    const chunk = 16 * 1024
+    let sent = 0
+    let ended = false
+    const request: AppendRequest = {
+      method: 'POST',
+      async *[Symbol.asyncIterator]() {
+        try {
+          for (;;) {
+            sent += chunk
+            yield Buffer.alloc(chunk, 'x')
+          }
+        } finally {
+          // `break` in the handler's `for await` returns the iterator: a real request is destroyed.
+          ended = true
+        }
+      },
+    }
+    const response = new FakeResponse()
+    await handleEngineLogAppend(request, response, hub, {})
+    expect(response.status).toBe(413)
+    expect(ended).toBe(true)
+    expect(sent).toBeGreaterThan(MAX_APPEND_BYTES + MAX_APPEND_DRAIN_BYTES)
+    expect(sent).toBeLessThanOrEqual(MAX_APPEND_BYTES + MAX_APPEND_DRAIN_BYTES + 2 * chunk)
+  })
+
+  test('a body a little over the limit is drained whole, so the 413 can go out', async () => {
+    let ended = false
+    let finished = false
+    const request: AppendRequest = {
+      method: 'POST',
+      async *[Symbol.asyncIterator]() {
+        try {
+          for (let i = 0; i < 10; i++) yield Buffer.alloc(16 * 1024, 'x')
+          finished = true
+        } finally {
+          ended = true
+        }
+      },
+    }
+    const response = new FakeResponse()
+    await handleEngineLogAppend(request, response, hub, {})
+    expect(response.status).toBe(413)
+    expect([finished, ended]).toEqual([true, true])
   })
 })

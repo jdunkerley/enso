@@ -91,15 +91,18 @@ render only its own slot content. The icon is already on the row, drawn by
     the declared-type rule did on develop, and draw its code through
     `NodeWidget` with a ▾ over it; `WidgetText`'s matcher already admits only
     placeholders and text literals. `WidgetFileBrowser` claims a browse
-    configuration, and otherwise only an argument of a declared `File`,
-    `Writable_File` or `Enso_Secret` type whose configuration is an annotation's
-    `Single_Choice` or `Text_Input`, or still `Pending` (the browse items join
-    its options, or sit in a dropdown over the text input: `Data.read`'s `path`
-    is `@path (Text_Input)` on `Text | URI | File`), never under the kind picker
-    and never from the type alone. An annotation's configuration keeps claiming
-    whatever the argument holds. A test of a browsable argument should answer
-    what the engine answers for it: a mocked `Single_Choice` hid the
-    `Text_Input` case (#926).
+    configuration, a type default's too and whatever the value (like R10: a ▾
+    over the code, so an argument or `Vector File` item holding a variable can
+    be given a file instead), and otherwise only an argument whose declared type
+    has a `File`, `Writable_File` or `Enso_Secret` member (exactly, by
+    `unionMembers`: `Vector File` is none) and whose configuration is an
+    annotation's `Single_Choice` or `Text_Input`, or still `Pending` (the browse
+    items join its options, or sit in a dropdown over the text input:
+    `Data.read`'s `path` is `@path (Text_Input)` on `Text | URI | File`), never
+    under the kind picker and never from the type alone. An annotation's
+    configuration keeps claiming whatever the argument holds. A test of a
+    browsable argument should answer what the engine answers for it: a mocked
+    `Single_Choice` hid the `Text_Input` case (#926).
   - **An offered auto-scoped constructor resolves without the engine**
     (`deriveAutoscopedCallInfo` in `@/util/callTree`, used by
     `widgetFunctionCallInfo.ts`): the engine resolves `..Equals` only when the
@@ -115,10 +118,16 @@ render only its own slot content. The icon is already on the row, drawn by
     into view; only a scroll that takes the item out of sight closes its
     submenu.
   - **A type default does not set the browse mode** (R9): `useBrowserTypeInfo`
-    treats it as no configuration, so the declared type decides. A
-    `File | Enso_Secret` union is a kind picker with File and Secret kinds, and
-    each kind's browser still offers both item types (its inner configuration is
-    a type default, which `useBrowserTypeInfo` ignores).
+    treats it as no configuration, so the declared type decides, except under
+    the kind picker (`underKindPicker`), where it is the chosen kind's widget:
+    the File kind of `File | Enso_Secret` browses files only, its Secret kind
+    secrets only.
+  - **The number and text widgets** (`WidgetText` 1001, `WidgetNumber` 1002):
+    the literal decides between them. A text literal under an annotation's
+    `Numeric_Input` keeps the text input (both score Perfect; the text widget
+    comes first), and `WidgetText` takes no number literal, so a number under
+    `Text_Input` keeps the number input
+    (`__tests__/numberTextPriority.test.ts`).
   - **A query runs in an executed frame**: the caller's expression when it has a
     computed value, otherwise any computed node of the graph shown
     (`graph.db.nodeIds()`; the answer does not depend on the frame). Failed or
@@ -341,14 +350,16 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
   database's `conversionSources`), but only when B itself has a widget (`URI`
   absorbs nothing): `Text | File` is just a File (`File.from (that : Text)`),
   while `Text | Regex` keeps both kinds (no `Regex.from (that : Text)` exists).
-  Of two that convert to each other the earlier stays, and if every member would
-  go the first stays. `Nothing` is never absorbed and never absorbs. Members
-  with deep-equal widgets collapse. Only `Single_Choice` kinds merge into one
-  `Single_Choice` (`Nothing` an option); a single kind stays that widget;
-  otherwise a `Union` with `Nothing` last. The result is memoised per type while
-  the member widgets and the conversion verdicts are unchanged, so a conversion
-  appearing later re-composes it. An engine-built `Widget.Union` (and a `@`
-  annotation) parse to the same `Union` configuration.
+  Conversions count through other members (A → B → C drops A and B), and of
+  members that all convert to each other (two, or a cycle of more) the earliest
+  stays; if every member would go the first stays. `Nothing` is never absorbed
+  and never absorbs. Members with deep-equal widgets collapse. Only
+  `Single_Choice` kinds merge into one `Single_Choice` (`Nothing` an option); a
+  single kind stays that widget; otherwise a `Union` with `Nothing` last. The
+  result is memoised per type while the member widgets and the conversion
+  verdicts are unchanged, so a conversion appearing later re-composes it. An
+  engine-built `Widget.Union` (and a `@` annotation) parse to the same `Union`
+  configuration.
 - **The look:** the icon of the kind the value is
   (`WidgetKindPicker/KindChip.vue`), directly in front of the value, which is
   drawn by that kind's own widget (the node still shows its code). On a selected
@@ -364,28 +375,41 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
   button). Elsewhere (a vector item, an operand) the picker draws the chip in
   front of its inner widget. Arrow keys move in the list (in `KindChip`, not in
   `DropdownWidget`); Enter chooses. Switching writes the kind's default code and
-  its imports in one edit.
+  its imports in one edit (`WidgetKindPicker/kindImports.ts`, shared with a
+  vector's new item). After a switch the chip's new button takes the focus
+  (`WidgetKindPicker/focusAfterSwitch.ts`): only the switched chip's (same node,
+  kinds and chosen kind), and nothing waits when the button was kept. The
+  picker's root does not stop Enter: its inner widgets handle Enter as they do
+  outside a union, and the chip and its list stop it themselves.
 - **Priority 44**: before `WidgetAnyToTarget` (45), `WidgetFileBrowser` (49),
   `WidgetSelection` (50), the date and time pickers and `WidgetRegex` (102),
   which draw the chosen kind inside it: a `Union` configuration must reach the
   picker first. A widget between the picker and `WidgetArgumentName` (100) must
   hand its input on to `<NodeWidget>` (spread, so `KindChipKey` survives), or
-  the name and the chip are lost. It scores only when the value is one of the
-  kinds (or unset), otherwise it steps aside and the value is drawn as any
-  other.
+  the name and the chip are lost; `__tests__/kindChipSpread.test.ts` reads every
+  widget in that band and fails on one that builds its inner input afresh. It
+  scores only when the value is one of the kinds (or unset), otherwise it steps
+  aside and the value is drawn as any other.
 - **`kindIcon`** (`WidgetKindPicker/kindIcon.ts`) is the one place to give a
   kind an icon; without one the chip shows the label.
 - **`matchKind` / `kindDefaultCode`** (`WidgetKindPicker/kindMatch.ts`) are the
   one place to teach a new widget kind its value shape: `matchKind` says which
   kind an expression is, `kindDefaultCode` the code switching to it writes (a
   test checks that each default reads back as its own kind). A vector's new item
-  uses the first kind with a default (`vectorItemDefault`,
-  `WidgetVector/elementType.ts`).
+  uses the first kind with a default (`vectorItemKind`, `vectorItemDefault`,
+  `WidgetVector/elementType.ts`), with that kind's imports. A vector value is
+  the first `Vector_Editor` kind whose item widget takes every item (so `[]` the
+  first of them), else the first kind taking any vector. An option written in
+  parentheses is matched without them only when they wrap it whole
+  (`stripOuterParentheses`: `(a) + (b)` is left as it is).
 - `WidgetRegex.vue` (priority 102, after `WidgetArgumentName`, since it draws
   the call from its parts) is the input of a `Regex_Input` argument: `regex '…'`
   is drawn as the call's head (`regex`, `Regex.compile`, as written) with the
   pattern edited in place by `WidgetText`; an unset argument is an empty input
-  that writes `regex '<text>'` on blur.
+  that writes `regex '<text>'` on blur. A `Regex` argument outside a union with
+  `tagValues` of its own gets the values' dropdown (`WidgetSelection`, 50)
+  around the regex input, by D1 (#919): an argument's own `tagValues` win over a
+  type default (`__tests__/regexSelection.test.ts`).
 
 ## Column pickers
 
@@ -396,9 +420,10 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
   expands every reference from it while `functionCallFromAnswer` builds the
   configuration, so a node with fifty pickers sends its columns once. The
   reference and `columns` schemas are zod types in `configuration.ts`.
-- The expansions are cached per project, keyed on the schema (`SchemaCache`, an
-  LRU of 64, in `projectStates.ts` beside `TypeDefaults`), so a recomputed table
-  that answers the same columns reuses them.
+- The expansions are cached per project, keyed on the schemas of every source
+  the picker reads, those of the pickers nested in its `extra` included
+  (`SchemaCache`, an LRU of 64, in `projectStates.ts` beside `TypeDefaults`), so
+  a recomputed table that answers the same columns reuses them.
 - `kinds` filters the columns offered; `Other` is always included.
 - **Absent source** (no `columns` entry for the picker's `from`): `Column_Name`
   without `extra` is a `Text_Input` (`expression` is ignored without a source);

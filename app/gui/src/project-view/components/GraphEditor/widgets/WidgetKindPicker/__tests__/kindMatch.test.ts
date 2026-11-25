@@ -83,6 +83,50 @@ test.each([
   expect(matchKind(kinds, parse(code))).toBe(expected)
 })
 
+const vectorOf = (label: string, item: object) =>
+  ({
+    label,
+    config: { kind: 'Vector_Editor', item_editor: item, item_default: "''" },
+  }) as const
+const vectorText = vectorOf('Vector Text', { kind: 'Text_Input' })
+const vectorInteger = vectorOf('Vector Integer', { kind: 'Numeric_Input' })
+const vectorTextOrInteger = vectorOf('Vector (Text | Integer)', {
+  kind: 'Union',
+  kinds: [text, integer],
+})
+
+test.each([
+  ['[]', [vectorText, vectorInteger], 0], // an empty vector is the first
+  ['[]', [vectorInteger, vectorText], 0],
+  ["['a', 'b']", [vectorText, vectorInteger], 0],
+  ['[1, (2)]', [vectorText, vectorInteger], 1],
+  ['[1]', [vectorInteger, vectorText], 0],
+  ["['a', 1]", [vectorText, vectorInteger], 0], // mixed: no kind takes every item, so the first
+  ['[x]', [vectorInteger, vectorText], 0],
+  ["['a', 1]", [vectorInteger, vectorTextOrInteger], 1], // a union item widget takes either
+  ['[1]', [vectorTextOrInteger, vectorInteger], 0],
+] as const)('two Vector_Editor kinds: matchKind(%s)', (code, kinds, expected) => {
+  expect(matchKind(kinds as never, parse(code))).toBe(expected)
+})
+
+const option = (value: string) =>
+  ({
+    label: 'Choice',
+    config: { kind: 'Single_Choice', values: [{ value, label: value, parameters: [] }] },
+  }) as const
+
+test.each([
+  ['(a) + (b)', '(a) + (b)', 0], // not mangled into `a) + (b`
+  ['(a) + (b)', '((a) + (b))', 0],
+  ['((a) + (b))', '(a) + (b)', 0],
+  ['(..Plain)', '..Plain', 0],
+  ["('(x')", "'(x'", 0], // a parenthesis inside a text literal is not counted
+  ['(a)', '(a) + (b)', undefined],
+  ['(a) + (b)', 'a', undefined],
+] as const)('the option %s matches the code %s: %s', (value, code, expected) => {
+  expect(matchKind([option(value)], parse(code))).toBe(expected)
+})
+
 test('an unset argument is the first kind', () => {
   expect(matchKind([integer, nothing], undefined)).toBe(0)
 })

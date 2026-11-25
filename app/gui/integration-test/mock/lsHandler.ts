@@ -799,7 +799,7 @@ const preprocessorOverrides = new Map<string, Uint8Array>()
 
 /**
  * `MODULE_CALL` of `@/util/moduleCall`, which this file cannot import: it pulls `@/util/ast` into
- * `tsconfig.node.json`'s closed file set.
+ * `tsconfig.node.json`'s closed file set. `util/__tests__/moduleCall.test.ts` checks the two agree.
  */
 const MODULE_CALL = 'Standard.Base.Meta.call_module_method'
 

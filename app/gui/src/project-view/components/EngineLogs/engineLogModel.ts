@@ -225,12 +225,12 @@ export interface LineClass {
 
 /**
  * Gives lines their level and origin. An entry has its own; a line that starts no entry continues
- * the previous entry and takes its level and origin (INFO and library before any); stderr is the
- * engine's, and ERROR.
+ * the previous entry **of its own source** and takes its level and origin (INFO and library before
+ * any): the IDE's `gui` lines arrive interleaved with the log file's, and a `gui` entry between a
+ * file entry and its stack trace must not take the trace. stderr is the engine's, and ERROR.
  */
 export class LineClassifier {
-  private level = INFO_LEVEL
-  private origin: LogOrigin = 'library'
+  private readonly current = new Map<EngineLogSource, { level: number; origin: LogOrigin }>()
 
   /** The level and origin of `text`, and whether it starts an entry. */
   classify(text: string, source: EngineLogSource): LineClass {
@@ -239,17 +239,20 @@ export class LineClassifier {
     }
     const entry = parseEntry(text)
     if (entry == null) {
-      return { level: this.level, entryStart: false, origin: this.origin }
+      const { level, origin } = this.current.get(source) ?? {
+        level: INFO_LEVEL,
+        origin: 'library',
+      }
+      return { level, entryStart: false, origin }
     }
-    this.level = entry.level
-    this.origin = logOrigin(entry.module)
-    return { level: entry.level, entryStart: true, origin: this.origin }
+    const origin = logOrigin(entry.module)
+    this.current.set(source, { level: entry.level, origin })
+    return { level: entry.level, entryStart: true, origin }
   }
 
-  /** Forget the current entry (a new session starts). */
+  /** Forget the current entries (a new session starts). */
   reset(): void {
-    this.level = INFO_LEVEL
-    this.origin = 'library'
+    this.current.clear()
   }
 }
 
