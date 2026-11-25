@@ -29,16 +29,48 @@ test("prettyText matches Enso's Text.pretty", () => {
   expect(prettyText("it's")).toBe("'it\\'s'")
 })
 
-test('Column_Name: one option per column, values pretty', () => {
+const typed = (label: string, value: string, detail: string) => ({ ...opt(label, value), detail })
+
+test('Column_Name: one option per column, values pretty, each with its type', () => {
   expect(expandPicker(name, cols)).toEqual({
     kind: 'Single_Choice',
     values: [
-      opt('A', "'A'"),
-      opt('B C', "'B C'"),
-      opt('D "E"', '\'D "E"\''),
-      opt('F.G/H\\I', "'F.G/H\\\\I'"),
+      typed('A', "'A'", 'Integer'),
+      typed('B C', "'B C'", 'Char'),
+      typed('D "E"', '\'D "E"\'', 'Mixed'),
+      typed('F.G/H\\I', "'F.G/H\\\\I'", 'Date'),
     ],
   })
+})
+
+test("a column's type is shown beside every kind of picker's option, never in its value", () => {
+  const types = {
+    names: ['A', 'B'],
+    kinds: ['Numeric', 'Numeric'],
+    type_names: ['Decimal (38, 10)', ''],
+  } as const
+  const details = (config: unknown) =>
+    (config as { values: { detail?: string }[] }).values.map((v) => v.detail)
+  const ref = expandPicker({ ...name, reference: true }, types)
+  expect(details(ref)).toEqual(['Decimal (38, 10)', undefined])
+  expect(ref.kind === 'Single_Choice' && ref.values[0]!.value).toBe("(..Name 'A')")
+  expect(
+    details(expandPicker({ kind: 'Column_Names', ...base, regex: false, by_type: false }, types)),
+  ).toEqual(['Decimal (38, 10)', undefined])
+  const orderBy = expandPicker({ kind: 'Order_By', from: null, name_only: true }, types)
+  expect(details((orderBy as { item_editor: unknown }).item_editor)).toEqual([
+    'Decimal (38, 10)',
+    undefined,
+  ])
+})
+
+test('a type change alone is a new schema', () => {
+  const cache = new SchemaCache()
+  const first = expandColumnPickers(name, { '': cols }, cache)
+  const retyped = { ...cols, type_names: ['Float', 'Char', 'Mixed', 'Date'] }
+  const second = expandColumnPickers(name, { '': retyped }, cache)
+  expect(second).not.toBe(first)
+  expect(second.kind === 'Single_Choice' && second.values[0]!.detail).toBe('Float')
 })
 
 test("Column_Name with an expression option first (filter's column)", () => {
