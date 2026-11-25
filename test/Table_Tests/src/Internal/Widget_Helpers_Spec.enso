@@ -8,6 +8,8 @@ from Standard.Table import Value_Type
 from Standard.Test import all
 from Standard.Table import Table
 
+from enso_dev.Helpers.Without_Clock import without_clock
+
 import Standard.Database_Test_Suite.Util
 
 main filter=Nothing =
@@ -59,9 +61,11 @@ add_specs suite_builder =
             chooser = make_column_ref_by_name_selector_for_type table value_type=Value_Type.Mixed
             equal = w.values.first
             equal.value . should_equal "..Equal"
-            equal.parameters . should_equal [["to", chooser]]
+            ## The choosers hold the current date and time: compare with those masked.
+            as_text parameters = parameters.map p-> [p.first, without_clock p.second.to_json]
+            as_text equal.parameters . should_equal (as_text [["to", chooser]])
             between = (w.values.find o-> o.label == "Comparisons") . value . find o-> o.label == "..Between"
-            between.parameters . should_equal [["lower", chooser], ["upper", chooser]]
+            as_text between.parameters . should_equal (as_text [["lower", chooser], ["upper", chooser]])
     suite_builder.group "Can run make_column_ref_by_name_selector_for_type" group_builder->
         table2 = Table.new [["Ints1", [1, 2, 3, 4]], ["Ints2", [1, 2, 3, 4]], ["Floats", [1.0, 2.0, 3.0, 4.0]], ["Texts", ["a", "b", "c", "d"]], ["Texts2", ["a", "b", "c", "d"]]]
         group_builder.specify "an integer type offers the Numeric kind and the number constant" <|

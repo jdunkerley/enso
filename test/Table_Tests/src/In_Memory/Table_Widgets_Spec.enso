@@ -20,6 +20,8 @@ from Standard.Table.Rows_To_Read import Rows_To_Read
 
 from Standard.Test import all
 
+from enso_dev.Helpers.Without_Clock import without_clock
+
 table_module = "Standard.Table.Table"
 table_type = "Standard.Table.Table.Table"
 
@@ -80,10 +82,12 @@ option_labelled widget label =
     choice_values widget . find o-> o.get "label" == label
 
 ## The nested pickers of a parsed option as `[name, picker JSON]` pairs.
-parameters_of option = option.get "parameters" . map p-> [p.first, p.second.to_json]
+parameters_of option = option.get "parameters" . map p-> [p.first, without_clock p.second.to_json]
 
-## The same pairs for pickers written as `Widget` values.
-pickers pairs = pairs.map p-> [p.first, p.second.to_json]
+## The same pairs for pickers written as `Widget` values. The "any value" choices
+   hold the current date and time, which differ from one build to the next: both
+   sides are compared with them masked.
+pickers pairs = pairs.map p-> [p.first, without_clock p.second.to_json]
 
 ## The nested pickers of the option labelled `label`.
 parameters_labelled widget label = parameters_of (option_labelled widget label)
@@ -272,7 +276,7 @@ add_specs suite_builder =
 
         group_builder.specify "filter's answer is exactly the builder's widget" <|
             expect = answer "filter" (Widget_Helpers.make_filter_condition_selector mock_table) (subject_columns mock_table) (resolver_of ["self", "column"])
-            Widget_Query.resolve_call mock_table table_module table_type "filter" ["filter"] . should_equal expect
+            without_clock (Widget_Query.resolve_call mock_table table_module table_type "filter" ["filter"]) . should_equal (without_clock expect)
 
         group_builder.specify "join offers a spatial group when the table is a Spatial_Table" pending="The builder asks `table.is_a Spatial_Table`, but its `table:Table` argument has already unwrapped a Spatial_Table, and a Table is never one: the group is never offered." <|
             widget = Widget_Helpers.make_join_condition_selector (Spatial_Table.from mock_table) right=mock_table

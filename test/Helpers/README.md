@@ -7,3 +7,7 @@ This project is not meant to be run directly.
 and the widget benchmark share (in-memory, SQLite and DuckDB); the importing
 test projects list `Helpers` under `testImports` in
 `tools/ci/stdlib-test-map.yaml`.
+
+`Without_Clock.without_clock` masks the current date and time that a column
+picker's "any value" choices hold, so two widgets built a second apart can be
+compared as text.
