@@ -282,12 +282,15 @@ render only its own slot content. The icon is already on the row, drawn by
   `providers/openedProjects/widgetRegistry/widgetQueryPlan.ts` (Note [When A
   Widget Query Re-Runs]): the first query sends every argument's expression id;
   after an answer, only the named dependencies' ids, and a `revision` stamp of
-  their code and computed value (the payload object; an edit may keep an
-  expression's id). The configuration keeps its identity while that plan is
-  equal (`WidgetFunction/stableConfig.ts`), so an argument nothing depends on
-  changing asks nothing; the subject being recomputed re-runs the visualization
-  in the engine. An answer is taken only when it is new since its query was sent
-  and echoes the query's `revision` (latest wins). **Static answers** (no
+  their code (an edit may keep an expression's id) and the payload object of
+  each node they name. **Never a dependency's own payload object**: the engine
+  sends an argument's unchanged value again after every query, so stamping it
+  re-queried forever (#961; Note [What A Dependency's Revision Reads]). The
+  configuration keeps its identity while that plan is equal
+  (`WidgetFunction/stableConfig.ts`), so an argument nothing depends on changing
+  asks nothing; the subject being recomputed re-runs the visualization in the
+  engine. An answer is taken only when it is new since its query was sent and
+  echoes the query's `revision` (latest wins). **Static answers** (no
   `resolver`, no `columns`) are kept per method and argument names for the
   project's session (`StaticAnswerCache`, an LRU of 256 in `projectStates.ts`),
   and a node they answer detaches its query; entries of a module are dropped
@@ -389,19 +392,26 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
   `WidgetKindPicker/kindChipKey.ts`), and `WidgetArgumentName` draws it between
   the name and the value (and leaves the value out while it is the `Nothing ▼`
   button). Elsewhere (a vector item, an operand) the picker draws the chip in
-  front of its inner widget. Arrow keys move in the list (in `KindChip`, not in
-  `DropdownWidget`); Enter chooses. Switching writes the kind's default code and
-  its imports in one edit (`WidgetKindPicker/kindImports.ts`, shared with a
-  vector's new item), except two switches that carry the value across
-  (`kindSwitchCode`, `WidgetKindPicker/kindMatch.ts`): Text → a list whose items
-  take it wraps it (`'x'` → `['x']`), and a list → Text keeps a single text
-  literal (`['a']` → `'a'`) and otherwise writes `''`, lossy by the owner's
-  choice. Only an explicit switch converts; nothing else rewrites the value.
-  After a switch the chip's new button takes the focus
-  (`WidgetKindPicker/focusAfterSwitch.ts`): only the switched chip's (same node,
-  kinds and chosen kind), and nothing waits when the button was kept. The
-  picker's root does not stop Enter: its inner widgets handle Enter as they do
-  outside a union, and the chip and its list stop it themselves.
+  front of its inner widget. Arrow keys move in the list (`KindChip` moves the
+  focus; it does not use `DropdownWidget`'s `keyboard` mode, which the selection
+  menus use); Enter chooses. Switching writes the kind's default code and its
+  imports in one edit (`WidgetKindPicker/kindImports.ts`, shared with a vector's
+  new item), except two switches that carry the value across (`kindSwitchCode`,
+  `WidgetKindPicker/kindMatch.ts`): Text → a list whose items take it wraps it
+  (`'x'` → `['x']`), and a list → Text keeps a single text literal (`['a']` →
+  `'a'`) and otherwise writes `''`, lossy by the owner's choice. Only an
+  explicit switch converts; nothing else rewrites the value. After a switch the
+  chip's new button takes the focus (`WidgetKindPicker/focusAfterSwitch.ts`):
+  only the switched chip's (same node, kinds and chosen kind), and nothing waits
+  when the button was kept. The picker's root does not stop Enter: its inner
+  widgets handle Enter as they do outside a union, and the chip and its list
+  stop it themselves. **The list shows every kind**, not the dropdown's usual
+  6.4 rows: it scrolls only when the window below the button is shorter
+  (`listMenuStyles` in `WidgetSelection/styles.ts` reports the height left,
+  which `KindChip` divides by the graph's zoom). A kind without an icon
+  (`Nothing`) has its label indented to line up with the labels after the icons.
+  The bare icon of an unselected node is 1 px lower than the port's centre, so
+  its glyph sits on the baseline of the text beside it.
 - **Priority 44**: before `WidgetAnyToTarget` (45), `WidgetFileBrowser` (49),
   `WidgetSelection` (50), the date and time pickers and `WidgetRegex` (102),
   which draw the chosen kind inside it: a `Union` configuration must reach the
@@ -426,9 +436,10 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
 - `WidgetRegex.vue` (priority 102, after `WidgetArgumentName`, since it draws
   the call from its parts) is the input of a `Regex_Input` argument: `regex '…'`
   is drawn as the call's head (`regex`, `Regex.compile`, as written) with the
-  pattern edited in place by `WidgetText`; an unset argument is an empty input
-  that writes `regex '<text>'` on blur. A `Regex` argument outside a union with
-  `tagValues` of its own gets the values' dropdown (`WidgetSelection`, 50)
+  pattern edited in place by `WidgetText`, both inside the outline a call in an
+  argument has (`WidgetFunction`'s `.nestedCall`); an unset argument is an empty
+  input that writes `regex '<text>'` on blur. A `Regex` argument outside a union
+  with `tagValues` of its own gets the values' dropdown (`WidgetSelection`, 50)
   around the regex input, by D1 (#919): an argument's own `tagValues` win over a
   type default (`__tests__/regexSelection.test.ts`).
 

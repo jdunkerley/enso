@@ -58,6 +58,7 @@ add_specs suite_builder =
             kinds_of "st_from_geojson" "column" . should_equal ["Textual"]
             kinds_of "st_from_wkt" "column" . should_equal ["Textual"]
             kinds_of "st_convex_hull" "column" . should_equal ["Other"]
+            kinds_of "st_concave_hull" "column" . should_equal ["Other"]
 
         group_builder.specify "the `range` of Column.take, Column.drop, Table.take and Table.drop" <|
             ["take", "drop"].each method->

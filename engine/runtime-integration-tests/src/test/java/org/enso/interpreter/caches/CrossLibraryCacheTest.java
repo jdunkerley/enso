@@ -96,7 +96,13 @@ public class CrossLibraryCacheTest {
     assertFalse("Alpha's IR is not reused once Beta changed", loaded.get("Alpha.Main"));
   }
 
-  /** (a), with Alpha's IR in its bindings cache (`enso --compile`) rather than per module. */
+  /**
+   * (a), with Alpha's IR in its bindings cache (`enso --compile`) rather than per module.
+   *
+   * <p>This asks how Alpha was loaded during the run, not whether a usable bindings cache exists
+   * afterwards: the run rewrites Alpha's bindings cache in the background once it has recompiled it
+   * (#562), so the latter depends on whether that rewrite has finished yet (#796).
+   */
   @Test
   public void editingAnImportedLibraryInvalidatesTheImportersBindingsCache() throws IOException {
     var root = createTree(Map.of("Main", "answer = 1\n"));
@@ -105,15 +111,9 @@ public class CrossLibraryCacheTest {
 
     writeLibrary(
         root, "Beta", Map.of("Main", "export project.Impl.answer\n", "Impl", "answer = 2\n"));
-    var bindingsUsed = new boolean[1];
-    assertEquals(
-        2L,
-        run(
-            root,
-            ctx ->
-                bindingsUsed[0] =
-                    ImportExportCache.create(new LibraryName(ns, "Alpha")).load(ctx).isPresent()));
-    assertFalse("Alpha's bindings cache is not used once Beta changed", bindingsUsed[0]);
+    var loaded = new HashMap<String, Boolean>();
+    assertEquals(2L, run(root, ctx -> loaded.putAll(loadedFromCache(ctx))));
+    assertFalse("Alpha's bindings cache is not used once Beta changed", loaded.get("Alpha.Main"));
   }
 
   /**

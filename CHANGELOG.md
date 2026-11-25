@@ -6,6 +6,12 @@
   `Text | Vector Text`, offers the list as a kind of its own. Switching from a
   text to the list wraps the text in a list, and switching back keeps a single
   text.][960]
+- [Argument dropdowns can be used from the keyboard: the arrow keys move through
+  the entries, also while typing to filter them, and Enter chooses one.][953]
+- [The list of kinds a union argument offers shows every kind without scrolling,
+  the kind icons sit on the text's baseline, the whole-number icon is redrawn to
+  read at small sizes, and a `regex '…'` value is outlined as one value
+  again.][950]
 - [A component placed from the component browser shows its arguments' widgets
   (pickers, dropdowns) as soon as it appears, instead of showing the bare
   argument names for a moment first.][952]
@@ -627,9 +633,11 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [960]: https://github.com/jdunkerley/enso/pull/960
+[953]: https://github.com/jdunkerley/enso/pull/953
 [949]: https://github.com/jdunkerley/enso/pull/949
 [940]: https://github.com/jdunkerley/enso/pull/940
 [941]: https://github.com/jdunkerley/enso/pull/941
+[950]: https://github.com/jdunkerley/enso/pull/950
 [952]: https://github.com/jdunkerley/enso/pull/952
 [951]: https://github.com/jdunkerley/enso/pull/951
 [933]: https://github.com/jdunkerley/enso/pull/933
