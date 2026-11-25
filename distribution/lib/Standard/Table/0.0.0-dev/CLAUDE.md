@@ -85,8 +85,8 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
 - Add `kinds=[Column_Kind.Numeric]` (and so on) only where the method cannot
   usefully take other kinds: it rejects them with a type error, fails on them
   later, or answers `Nothing`. Leave it off where any column is fine, and where
-  the method accepts a kind in any path (`Maximum` takes `Mixed`, `expand_to_rows`
-  passes a non-aggregate through, `format` formats anything).
+  the method accepts a kind in any path (`Maximum` takes `Mixed`,
+  `expand_to_rows` passes a non-aggregate through, `format` formats anything).
 - **A widget that depends on another argument is a resolver** (Base's
   `CLAUDE.md`, "Resolvers"): write the dependency as a parameter named after the
   argument, defaulted to `Nothing`
