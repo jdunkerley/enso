@@ -2,6 +2,9 @@
 
 #### Enso IDE
 
+- [A component placed from the component browser shows its arguments' widgets
+  (pickers, dropdowns) as soon as it appears, instead of showing the bare
+  argument names for a moment first.][952]
 - [Column dropdowns show each column's type beside its name.][949]
 - [Table expressions suggest the values an argument takes: typing
   `cast([Value], ..` lists the value types to cast to.][941]
@@ -622,6 +625,7 @@
 [949]: https://github.com/jdunkerley/enso/pull/949
 [940]: https://github.com/jdunkerley/enso/pull/940
 [941]: https://github.com/jdunkerley/enso/pull/941
+[952]: https://github.com/jdunkerley/enso/pull/952
 [951]: https://github.com/jdunkerley/enso/pull/951
 [933]: https://github.com/jdunkerley/enso/pull/933
 [926]: https://github.com/jdunkerley/enso/pull/926
