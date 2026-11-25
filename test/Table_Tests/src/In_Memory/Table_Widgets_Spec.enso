@@ -138,6 +138,14 @@ add_specs suite_builder =
             [["select_columns", "columns"], ["distinct", "columns"], ["cast", "columns"], ["format", "columns"], ["filter", "column"]].each p->
                 (widget_of mock_table p.first p.second).get "kinds" . should_equal []
 
+        group_builder.specify "methods that look as if they need one kind but take every kind keep them" <|
+            ## Each of these accepts a column of any kind: `expand_column` and `expand_to_rows` pass a
+               value that is no object or aggregate through, `format` and `json_stringify` convert any
+               value, `running`'s default statistic (`Count`) and `cross_tab`'s `names` take any column.
+            [["expand_column", "columns"], ["expand_to_rows", "column"], ["json_stringify", "columns"], ["auto_cast", "columns"], ["transpose", "key_columns"], ["cross_tab", "names"], ["running", "of"], ["fill_nothing", "columns"], ["offset", "columns"], ["replace", "columns"]].each p->
+                Test.with_clue p.first+" "+p.second+": " <|
+                    (widget_of mock_table p.first p.second).get "kinds" . should_equal []
+
         group_builder.specify "join's Ignore Case condition offers text columns, Equals offers every kind" <|
             abc = Table.from_rows ["A", "B", "C"] []
             item = Standard.Table.Internal.Widget_Helpers.make_join_condition_selector abc right=abc . item_editor
