@@ -2828,6 +2828,52 @@ test.describe('Kind picker', () => {
     await expect(node.getByRole('button', { name: /change kind/ })).toHaveCount(0)
   })
 
+  test('the list shows every kind of a long union, without scrolling', async ({
+    editorPage,
+    page,
+    localApi,
+  }) => {
+    const widget = (constructor: string, fields: object = {}) => ({
+      type: 'Widget',
+      constructor,
+      ...fields,
+    })
+    /* eslint-disable camelcase */
+    const kinds: [string, object][] = [
+      ['Integer', widget('Numeric_Input')],
+      ['Float', widget('Numeric_Input')],
+      ['Text', widget('Text_Input')],
+      ['Boolean', widget('Boolean_Input')],
+      ['Date', widget('Date_Input')],
+      ['Time_Of_Day', widget('Time_Input')],
+      ['Date_Time', widget('Date_Time_Input')],
+      ['Regex', widget('Regex_Input')],
+      ['Enso_Secret', widget('Secret_Browse')],
+      ['File', widget('File_Browse', { file_types: [] })],
+      ['Folder', widget('Folder_Browse')],
+    ]
+    const union = widget('Union', { kinds, include_nothing: true })
+    /* eslint-enable camelcase */
+    await editorPage.mockSuggestion(
+      unionMethod('annotated', `${INTEGER} | ${NOTHING}`, { annotations: ['value'] }),
+    )
+    await localApi.updateVisualization('.annotated', [['value', union]])
+    await mockMethodCallInfo(page, 'annot', {
+      methodPointer: { module: T, definedOnType: T, name: 'annotated' },
+      notAppliedArguments: [0],
+    })
+    const node = locate.graphNodeByBinding(page, 'annot')
+    await expect(node.locator('.kindIcon')).toHaveAttribute('title', 'Integer')
+    await select(page, node)
+    await changeKind(node, 'Integer').click()
+    await list(page).expectVisibleWithOptions([...kinds.map(([label]) => label), 'Nothing'])
+    // Twelve rows, where the dropdown's usual cap is about seven: the list is not cut short.
+    const scroller = page.locator('.DropdownWidget:not([data-transitioning]) .list')
+    await expect
+      .poll(() => scroller.evaluate((list) => list.scrollHeight - list.clientHeight))
+      .toBeLessThanOrEqual(0)
+  })
+
   test('Vector (Text | Integer): every item has an icon and + adds an empty text', async ({
     editorPage,
     page,

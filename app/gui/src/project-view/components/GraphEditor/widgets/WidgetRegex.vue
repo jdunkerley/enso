@@ -73,7 +73,7 @@ export const widgetDefinition = defineWidget(
 </script>
 
 <template>
-  <div v-if="pattern && head" class="WidgetRegex">
+  <div v-if="pattern && head" class="WidgetRegex widgetRounded">
     <NodeWidget :input="WidgetInput.FromAst(head)" />
     <NodeWidget :input="WidgetInput.FromAst(pattern)" />
   </div>
@@ -87,10 +87,14 @@ export const widgetDefinition = defineWidget(
 </template>
 
 <style scoped>
+/* Outlined as a call inside an argument is (`WidgetFunction`'s `.nestedCall`), so the head and the
+   pattern read as one value: the outline takes no space, and the head keeps a rounding's padding. */
 div.WidgetRegex {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--widget-token-pad-unit);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: var(--node-port-border-radius);
 }
 
 .WidgetRegex,
