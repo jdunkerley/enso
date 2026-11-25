@@ -1082,8 +1082,10 @@ buffer; the runner feeds it through `EngineLogSink` (`engineStarted`,
   message cannot forge an entry (the panel's `ENTRY_RE` is anchored to the line
   start). Statuses: 204 added; 400 not a valid body or unknown project id; 404
   the project is not open; 405 not a POST; 413 over 64 KiB (the rest of the body
-  is drained, so the socket survives to carry the 413). A body that fails
-  mid-read ends the response. Both hosts route it and log a handler rejection.
+  is drained, so the socket survives to carry the 413, but at most 1 MiB of it,
+  `MAX_APPEND_DRAIN_BYTES`: past that the request is destroyed). A body that
+  fails mid-read ends the response. Both hosts route it and log a handler
+  rejection.
 - **Ordering (#280).** Node reports a child's `exit` before its stdio has
   drained, so the old engine's last stderr (a crash dump) can still be in the
   pipe. `ChildProcessHandle.waitForDrain` waits for `close` (bounded by 1 s,

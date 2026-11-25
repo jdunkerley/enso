@@ -64,6 +64,55 @@ describe('EngineLogModel', () => {
     ])
   })
 
+  test("a gui entry between a file entry and its continuation lines takes neither's level or origin", () => {
+    const f = feed()
+    f.hello()
+    f.line(entry('ERROR', 'failed'))
+    f.line('[INFO] [2026-10-20T10:00:00.000Z] [enso.gui.performance] widget timing', 'gui')
+    f.line('  at Foo.bar')
+    f.line('  continued in the gui', 'gui')
+    f.model.commit()
+    expect(
+      f.model.rows.map((row) =>
+        row.kind === 'line' ? [row.source, row.level, row.origin, row.entryStart] : null,
+      ),
+    ).toEqual([
+      ['file', ERROR_LEVEL, 'engine', true],
+      ['gui', INFO_LEVEL, 'performance', true],
+      ['file', ERROR_LEVEL, 'engine', false],
+      ['gui', INFO_LEVEL, 'performance', false],
+    ])
+  })
+
+  test("a new engine's continuation lines forget the previous session's entries, of every source", () => {
+    const f = feed()
+    f.hello()
+    f.line(entry('ERROR', 'failed'))
+    f.line('[WARN] [2026-10-20T10:00:00.000Z] [enso.gui.Widgets] bad answer', 'gui')
+    f.waiting()
+    f.line('  orphan file line')
+    f.line('  orphan gui line', 'gui')
+    f.model.commit()
+    const orphans = f.model.rows.filter((row) => row.kind === 'line' && row.text.includes('orphan'))
+    expect(orphans.map((row) => (row.kind === 'line' ? [row.level, row.origin] : null))).toEqual([
+      [INFO_LEVEL, 'library'],
+      [INFO_LEVEL, 'library'],
+    ])
+  })
+
+  test('a lower-case file entry (the enso CLI) has its level', () => {
+    const f = feed()
+    f.hello()
+    f.line('[error] [2026-10-20T10:00:00Z] [org.enso.Test] broken')
+    f.line('  at Foo.bar')
+    f.model.commit()
+    expect(f.model.rows.map((row) => (row.kind === 'line' ? row.level : null))).toEqual([
+      ERROR_LEVEL,
+      ERROR_LEVEL,
+    ])
+    expect(f.model.unseenErrors).toBe(1)
+  })
+
   test('ignores an event it already has', () => {
     const f = feed()
     f.hello()
