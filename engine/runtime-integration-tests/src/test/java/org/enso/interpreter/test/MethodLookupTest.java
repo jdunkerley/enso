@@ -114,4 +114,35 @@ public class MethodLookupTest {
                     + "|[a, b]|[a]|[a]|[a, b, c]|[x]|error:No_Such_Method",
                 res.asString()));
   }
+
+  /** A type name that names neither a loaded type nor a module is a {@code No_Such_Type}. */
+  @Test
+  public void unknownTypeIsNoSuchType() throws IOException {
+    var main =
+        new SourceModule(
+            QualifiedName.fromString("Main"),
+            """
+            from Standard.Base import all
+
+            show r = if r.is_error then "error:" + (Meta.type_of r.catch . to_text) + ":" + r.catch.to_display_text else r.to_text
+
+            main =
+                m = "local.Proj.Main"
+                results = Vector.build b->
+                    b.append (show (Meta.find_type_or_module "local.Proj.Main.Nope"))
+                    b.append (show (Meta.get_method_annotation m "local.Proj.Main.Nope" "f" "a"))
+                    b.append (show (Meta.get_method_argument_names m "local.Proj.Nope.T" "f"))
+                results.join "|"
+            """);
+    var projDir = tempFolder.newFolder().toPath();
+    ProjectUtils.createProject("Proj", Set.of(main), projDir);
+    ProjectUtils.testProjectRun(
+        projDir,
+        res ->
+            assertEquals(
+                "error:No_Such_Type:Type local.Proj.Main.Nope does not exist."
+                    + "|error:No_Such_Type:Type local.Proj.Main.Nope does not exist."
+                    + "|error:No_Such_Type:Type local.Proj.Nope.T does not exist.",
+                res.asString()));
+  }
 }

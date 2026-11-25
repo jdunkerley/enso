@@ -9,12 +9,37 @@ import org.enso.interpreter.runtime.data.Type;
 import org.enso.interpreter.runtime.error.DataflowError;
 import org.enso.pkg.QualifiedName;
 
+/*
+ * Note [Method Lookup Compiles Without A Lock]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * `Module.compileScope` compiles a module that is not compiled yet, and its documentation asks for
+ * the write compilation lock then. That lock belongs to the runtime-server instrument (`Locking` in
+ * `runtime-instrument-common`); nothing in `engine/runtime` can reach it, and no builtin takes it:
+ * `LookupServicesNode.findType`, `InvokeMethodImportResolver.createResolvedImport` and the
+ * `Module` interop messages (`get_method`, `get_type`, `get_associated_type`) all call
+ * `compileScope` as this class does.
+ *
+ * What makes it safe enough is where these builtins run: inside the user's program. In the IDE that
+ * is an `ExecuteJob`, which holds the read compilation lock for its whole run, or an
+ * `UpsertVisualizationJob`, which evaluates a visualization holding the write lock (or else defers
+ * it to the next `ExecuteJob`). Either way no other holder of the write lock (`EnsureCompiledJob`,
+ * a rename, a recompute) changes or recompiles modules meanwhile. A module compiled here is one
+ * that nothing compiled before (a library module the project does not import): the same lazy
+ * compilation `ProgramExecutionSupport` does under the read lock when it evaluates a deferred
+ * visualization's module. Outside the IDE (`enso --run`, tests) there is no lock at all.
+ *
+ * What it does not cover: two programs running at once (two execution contexts, each holding the
+ * read lock) that both compile the same not-yet-compiled module. Every lazy compilation path above
+ * shares that exposure; a fix belongs in `Module.compileScope` itself, not in each caller.
+ */
+
 /**
  * Finds a method by the names an IDE method pointer gives it: the module that defines it, the type
  * (or module) it is defined on, and its name. Unlike dispatch on a value ({@code
  * Meta.get_annotation}), this finds exactly that definition: a static method, an extension method
  * defined in another module, or a method of {@code Any} that the value's own type also defines.
- * Each module is compiled on first use, as {@link LookupServicesNode} does.
+ * Each module is compiled on first use, as {@link LookupServicesNode} does, without the compilation
+ * lock (Note [Method Lookup Compiles Without A Lock]).
  */
 final class MethodLookup {
   private MethodLookup() {}
@@ -22,8 +47,10 @@ final class MethodLookup {
   /**
    * The type named {@code qualifiedName}: one defined in its parent module, or else the module
    * itself (its associated type, which module methods are defined on); {@code null} when neither is
-   * loaded. A type wins over a module of the same name: {@code Standard.Table.Table.Table} is the
-   * type ({@code Meta.find_type_by_qualified_name} gives the module there).
+   * loaded. The type is looked for first. A loaded type cannot share its qualified name with a
+   * loaded module: a module exports its submodules, so a module {@code X.Y} that defined a type
+   * {@code Z} beside the module {@code X.Y.Z} would not compile ({@code
+   * ConflictingResolutionsError}). A module method's lookup therefore finds the module.
    */
   @TruffleBoundary
   static Type findType(EnsoContext ctx, String qualifiedName) {
@@ -43,8 +70,9 @@ final class MethodLookup {
 
   /**
    * The function {@code methodName} that the module {@code moduleName} defines on {@code typeName}:
-   * the type's constructor, else an instance or a static method. A dataflow error ({@code
-   * Module_Does_Not_Exist}, {@code No_Such_Method}) when there is none.
+   * the type's constructor, else an instance or a static method. A dataflow error when there is
+   * none: {@code Module_Does_Not_Exist} for the module, {@code No_Such_Type} for the type, {@code
+   * No_Such_Method} for the method.
    */
   @TruffleBoundary
   static Object findMethod(Node location, String moduleName, String typeName, String methodName) {
@@ -58,7 +86,7 @@ final class MethodLookup {
     var scope = module.get().compileScope(ctx);
     var type = findType(ctx, typeName);
     if (type == null) {
-      return DataflowError.withDefaultTrace(errors.makeModuleDoesNotExistError(typeName), location);
+      return DataflowError.withDefaultTrace(errors.makeNoSuchType(typeName), location);
     }
     // A constructor first: constructor names are capitalised, so no method clashes with one, and
     // the scope can hold an accessor of the same name that carries no annotations.

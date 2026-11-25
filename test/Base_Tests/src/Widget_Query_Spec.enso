@@ -1,6 +1,7 @@
 from Standard.Base import all
 import Standard.Base.Errors.Common.Module_Does_Not_Exist
 import Standard.Base.Errors.Common.No_Such_Method
+import Standard.Base.Errors.Common.No_Such_Type
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
 import Standard.Base.Metadata.Choice
@@ -203,6 +204,17 @@ add_specs suite_builder =
             Meta.get_method_argument_names spec_module sample_type "two" . should_equal ["first", "second"]
             Meta.get_method_argument_names spec_module spec_module "add_defaults" . should_equal ["a", "b", "c"]
             Meta.get_method_argument_names spec_module sample_type "nope" . should_fail_with No_Such_Method
+            Meta.get_method_argument_names spec_module spec_module+".Nope" "two" . should_fail_with No_Such_Type
+
+    suite_builder.group "Meta.find_type_or_module" group_builder->
+        group_builder.specify "finds a type, else a module" <|
+            Meta.find_type_or_module sample_type . should_equal Sample
+            Meta.find_type_or_module spec_module . is_error . should_be_false
+
+        group_builder.specify "fails with No_Such_Type for a name that is neither" <|
+            result = Meta.find_type_or_module spec_module+".Nope"
+            result.should_fail_with No_Such_Type
+            result.catch.to_display_text . should_equal "Type "+spec_module+".Nope does not exist."
 
     suite_builder.group "Widget_Query.resolve_call finds exactly the method a call names" group_builder->
         sample = Sample.Value "a label"
@@ -352,6 +364,11 @@ add_specs suite_builder =
             error = error_of (Widget_Query.resolve_call sample spec_module sample_type "missing" ["arg"])
             error.get "step" . should_equal "lookup"
 
+        group_builder.specify "a type that does not exist" <|
+            error = error_of (Widget_Query.resolve_call sample spec_module spec_module+".Nope" "probe" ["arg"])
+            error.get "step" . should_equal "lookup"
+            error.get "message" . should_equal "Type "+spec_module+".Nope does not exist."
+
     suite_builder.group "Widget_Query.resolve_call with an error as the subject" group_builder->
         group_builder.specify "gives no widget for every argument, and no error" <|
             subject = Error.throw (Illegal_Argument.Error "x")
@@ -432,6 +449,7 @@ add_specs suite_builder =
         group_builder.specify "answers a lookup error for an unknown type" <|
             json = Widget_Query.resolve_type spec_module+".Nope" . parse_json
             json.get "error" . get "step" . should_equal "lookup"
+            json.get "error" . get "message" . should_equal "Type "+spec_module+".Nope does not exist."
         group_builder.specify "a resolver default is announced, not run" <|
             Widget_Query.resolve_type (spec_module + ".Needs_Subject") . should_equal '{"widget":null,"resolver":{"dependencies":["self","right"],"searchable":false}}'
         group_builder.specify "answers a type_default error when the conversion fails" <|
