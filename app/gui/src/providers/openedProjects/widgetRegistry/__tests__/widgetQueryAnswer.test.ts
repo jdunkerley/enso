@@ -267,8 +267,8 @@ describe('functionCallFromAnswer', () => {
       values: [
         { label: '<Text Value>', value: '""', parameters: [], icon: '' },
         { label: '<Expression>', value: "(expr '[county]')", parameters: [] },
-        { label: 'county', value: "(..Name 'county')", parameters: [] },
-        { label: '[county]', value: "(..Name '[county]')", parameters: [] },
+        { label: 'county', value: "(..Name 'county')", parameters: [], detail: 'Char' },
+        { label: '[county]', value: "(..Name '[county]')", parameters: [], detail: 'Char' },
       ],
     }
     for (const [call, argument] of [

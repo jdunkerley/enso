@@ -37,13 +37,27 @@ export class ExpressionTag {
    * @param explicitLabel - If provided, this label will be used instead of the stringified expression.
    * @param explicitIcon - If provided, this icon will be displayed with the label
    * @param requiredImports - The imports required by the expression, will be added to the code when the item is clicked.
+   * @param detail - A quiet note shown beside the label (a column's type); never part of the code.
    */
   constructor(
     readonly expression: string,
     readonly explicitLabel?: Opt<string>,
     private explicitIcon?: Opt<Icon>,
     readonly requiredImports?: RequiredImport[],
+    readonly detail?: string,
   ) {}
+
+  /** This tag with `detail` shown beside its label. */
+  withDetail(detail: string | undefined): ExpressionTag {
+    if (detail === this.detail) return this
+    return new ExpressionTag(
+      this.expression,
+      this.explicitLabel,
+      this.explicitIcon,
+      this.requiredImports,
+      detail,
+    )
+  }
 
   /**
    * Create a new {@link ExpressionTag} from qualified path to a suggestion entry.
@@ -185,7 +199,13 @@ export class NestedChoiceTag {
       if (choice instanceof ExpressionTag) {
         const newLabel = prefix + this.internalLabel + ' → ' + choice.label
         result.push(
-          new ExpressionTag(choice.expression, newLabel, choice.icon, choice.requiredImports),
+          new ExpressionTag(
+            choice.expression,
+            newLabel,
+            choice.icon,
+            choice.requiredImports,
+            choice.detail,
+          ),
         )
       } else if (choice instanceof NestedChoiceTag) {
         result.push(...choice.flatten(prefix + this.internalLabel + ' → '))
@@ -283,7 +303,9 @@ export function useExpressionTags({
         toValue(libraryPublicTypes) ?? new Map(),
         requires,
       )
-      return imports ? new ExpressionTag(tag.expression, tag.explicitLabel, tag.icon, imports) : tag
+      return imports ?
+          new ExpressionTag(tag.expression, tag.explicitLabel, tag.icon, imports, tag.detail)
+        : tag
     }
 
     const choiceToTag = (choice: Choice): ExpressionTag | NestedChoiceTag => {
@@ -297,7 +319,8 @@ export function useExpressionTags({
         choice.label,
         choice.icon,
       )
-      return choice.requires ? withRequiredType(tag, choice.requires) : tag
+      const detailed = tag.withDetail(choice.detail ?? undefined)
+      return choice.requires ? withRequiredType(detailed, choice.requires) : detailed
     }
 
     return config.values.map(choiceToTag)
@@ -318,6 +341,7 @@ export function useTagEntries<T extends ExpressionTag | NestedChoiceTag | Action
       key: tag instanceof ExpressionTag ? tag.toString() : undefined,
       selected: tag instanceof ExpressionTag && isSelected(tag.expression),
       icon: tag instanceof ExpressionTag || tag instanceof ActionTag ? tag.icon : undefined,
+      detail: tag instanceof ExpressionTag ? tag.detail : undefined,
       tag,
       isNested: tag instanceof NestedChoiceTag,
       nestedValues: tag instanceof NestedChoiceTag ? tag.choices.map(tagToEntry) : [],

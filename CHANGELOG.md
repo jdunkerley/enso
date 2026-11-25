@@ -2,6 +2,7 @@
 
 #### Enso IDE
 
+- [Column dropdowns show each column's type beside its name.][949]
 - [Table expressions suggest the values an argument takes: typing
   `cast([Value], ..` lists the value types to cast to.][941]
 - [Widgets that depend on other arguments (join conditions, filter values,
@@ -616,6 +617,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[949]: https://github.com/jdunkerley/enso/pull/949
 [940]: https://github.com/jdunkerley/enso/pull/940
 [941]: https://github.com/jdunkerley/enso/pull/941
 [933]: https://github.com/jdunkerley/enso/pull/933

@@ -3005,6 +3005,40 @@ test.describe('Column pickers', () => {
     await dropDown.expectVisibleWithOptions(['Right X', 'Right Y'])
   })
 
+  test("a column picker shows each column's type, and picks just the name", async ({
+    editorPage,
+    page,
+    localApi,
+  }) => {
+    await editorPage.mockSuggestion(method('lone_column', ['column']))
+    await localApi.updateVisualization('.lone_column', {
+      arguments: [['column', { widget: picker(null) }]],
+      columns: {
+        '': {
+          names: ['Name', 'Price', 'Notes'],
+          kinds: ['Textual', 'Numeric', 'Textual'],
+          // eslint-disable-next-line camelcase
+          type_names: ['Char', 'Decimal (38, 10)', ''],
+        },
+      },
+    })
+    await mockMethodCallInfo(page, 'lone', pointer('lone_column'))
+    const node = locate.graphNodeByBinding(page, 'lone')
+    const dropDown = new DropDownLocator(node.locator('.WidgetTopLevelArgument').first())
+    await dropDown.clickWidget()
+    await dropDown.expectVisibleWithOptions(['Name', 'Price', 'Notes'])
+    await expect(dropDown.item('Name').locator('.itemDetail')).toHaveText('Char')
+    await expect(dropDown.item('Price').locator('.itemDetail')).toHaveText('Decimal (38, 10)')
+    // A column whose type is not known has no type shown.
+    await expect(dropDown.item('Notes').locator('.itemDetail')).toHaveCount(0)
+    // The type is not part of the entry's accessible name: it is still the column's name.
+    await expect(
+      dropDown.dropDown.getByRole('button', { name: 'Price', exact: true }),
+    ).toBeVisible()
+    await dropDown.clickOption('Price')
+    expect(await moduleCode(page)).toContain("lone = Data.lone_column 'Price'\n")
+  })
+
   test('a column picker with no source is a text input', async ({ editorPage, page, localApi }) => {
     await editorPage.mockSuggestion(method('lone_column', ['column']))
     await localApi.updateVisualization('.lone_column', {
