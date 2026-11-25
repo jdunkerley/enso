@@ -4,6 +4,7 @@
  */
 import { reportWidgetSchemaMismatch } from '$/providers/engineLogAppend'
 import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
+import { Ast } from '@/util/ast'
 import { MODULE_CALL } from '@/util/moduleCall'
 import { parseAbsoluteProjectPathRaw } from '@/util/projectPath'
 import { pauseTracking, resetTracking } from '@vue/reactivity'
@@ -22,9 +23,12 @@ import { type Converts, NOTHING_TYPE, composeUnion, unionMembers } from './union
 /** The type of widgets: a type has a default when `Widget.from` converts it. */
 export const WIDGET_TYPE = 'Standard.Base.Metadata.Widget'
 
-/** The expression asking the engine for the default widget of the type `typeName`. */
+/**
+ * The expression asking the engine for the default widget of the type `typeName`. The name is
+ * written as an escaped text literal: a type path holds no `'` today, but nothing guarantees it.
+ */
 export const RESOLVE_TYPE_EXPRESSION = (typeName: string) =>
-  `${MODULE_CALL} 'Standard.Base.Metadata.Widget_Query' 'resolve_type' [] '${typeName}'`
+  `${MODULE_CALL} 'Standard.Base.Metadata.Widget_Query' 'resolve_type' [] ${Ast.TextLiteral.new(typeName).code()}`
 
 /**
  * The answer of `Widget_Query.resolve_type` (exported for the tests). A type whose default is a
@@ -111,7 +115,13 @@ export class TypeDefaults {
   private readonly cache = reactive(new Map<string, CacheEntry>())
   private readonly delays = new Map<string, number>()
   private readonly timers = new Set<ReturnType<typeof setTimeout>>()
-  /** The frames each type's query failed in, since its last answer. */
+  /** Set by {@link dispose}: a query still in flight then records nothing and starts no timer. */
+  private disposed = false
+  /**
+   * The frames each type's query failed in, since its last answer. A frame that answers any type
+   * leaves every type's set: it is evidently usable, and would otherwise be avoided until the
+   * type's own next answer, which may never come.
+   */
   private readonly failedFrames = new Map<string, Set<ExternalId>>()
   /** The composed widget of each union asked for, with the member widgets it was built from. */
   private readonly composed = new Map<
@@ -240,13 +250,16 @@ export class TypeDefaults {
     return entry
   }
 
-  /** Stop the pending retries. */
+  /** Stop the pending retries; a query still in flight is ignored when it settles. */
   dispose() {
+    this.disposed = true
     this.timers.forEach(clearTimeout)
     this.timers.clear()
+    this.failedFrames.clear()
   }
 
   private retryLater(type: string) {
+    if (this.disposed) return
     // Not through the reactive proxy: dependents must not run before the timer fires.
     toRaw(this.cache).set(type, { state: 'retry' })
     const delay = this.delays.get(type) ?? RETRY_DELAY_MS
@@ -256,6 +269,15 @@ export class TypeDefaults {
       this.cache.delete(type)
     }, delay)
     this.timers.add(timer)
+  }
+
+  /** `frame` answered: no type avoids it any more. */
+  private forgetFailure(frame: ExternalId | undefined) {
+    if (frame == null) return
+    for (const [type, failed] of this.failedFrames) {
+      failed.delete(frame)
+      if (failed.size === 0) this.failedFrames.delete(type)
+    }
   }
 
   /** Picks the frame without making the calling computed depend on what it reads. */
@@ -282,6 +304,7 @@ export class TypeDefaults {
     } catch {
       result = null
     }
+    if (this.disposed) return
     // No answer yet (no frame, subdoc not synced), a timeout or a failed slot: ask again later.
     if (result == null || !result.ok) {
       if (frame != null) {
@@ -293,6 +316,7 @@ export class TypeDefaults {
     }
     this.delays.delete(type)
     this.failedFrames.delete(type)
+    this.forgetFailure(frame)
     const parsed = answerSchema.safeParse(result.value)
     if (!parsed.success) {
       reportWidgetSchemaMismatch(

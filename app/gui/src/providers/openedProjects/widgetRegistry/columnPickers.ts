@@ -44,10 +44,23 @@ function option(label: string, value: string, parameters: ArgsWidgetConfiguratio
   return { label, value, parameters }
 }
 
-/** The names of `columns` which `kinds` admit: all if empty, else those of a listed kind or `Other`. */
-function offeredNames(columns: WidgetColumns, kinds: readonly ColumnKind[]): string[] {
-  if (kinds.length === 0) return columns.names
-  return columns.names.filter((_, i) => {
+/** A column's option: its name, and its type (`type_names`) as the entry's quiet `detail`. */
+function columnOption(column: OfferedColumn, value: string): Choice {
+  const choice = option(column.name, value)
+  return column.typeName ? { ...choice, detail: column.typeName } : choice
+}
+
+interface OfferedColumn {
+  name: string
+  /** The library's own name of the column's type (`Decimal (38, 10)`); empty if not known. */
+  typeName: string
+}
+
+/** The columns of `columns` which `kinds` admit: all if empty, else those of a listed kind or `Other`. */
+function offeredColumns(columns: WidgetColumns, kinds: readonly ColumnKind[]): OfferedColumn[] {
+  const all = columns.names.map((name, i) => ({ name, typeName: columns.type_names[i] ?? '' }))
+  if (kinds.length === 0) return all
+  return all.filter((_, i) => {
     const kind = columns.kinds[i]
     return kind == null || kind === 'Other' || kinds.includes(kind)
   })
@@ -66,8 +79,11 @@ function expandColumnName(
   const first = columns.names[0]
   const expression =
     picker.expression && first != null ? [option('<Expression>', `(expr '[${first}]')`)] : []
-  const names = offeredNames(columns, picker.kinds).map((name) =>
-    option(name, picker.reference ? `(..Name ${prettyText(name)})` : prettyText(name)),
+  const names = offeredColumns(columns, picker.kinds).map((column) =>
+    columnOption(
+      column,
+      picker.reference ? `(..Name ${prettyText(column.name)})` : prettyText(column.name),
+    ),
   )
   return {
     kind: 'Single_Choice',
@@ -99,7 +115,9 @@ function expandOrderBy(
   const first = columns.names[0]
   const values =
     picker.name_only ?
-      columns.names.map((name) => option(name, `(..Name ${prettyText(name)})`))
+      offeredColumns(columns, []).map((column) =>
+        columnOption(column, `(..Name ${prettyText(column.name)})`),
+      )
     : [
         option('Name', '..Name', [
           ['name', expandColumnName(plainColumnName([], picker.from), columns)],
@@ -134,7 +152,9 @@ export function expandPicker(
       // An absent source with no flags offers nothing to choose from: free text (owner decision 13).
       if (!columns && flags.length === 0) return { kind: 'Text_Input' }
       const names =
-        columns ? offeredNames(columns, picker.kinds).map((n) => option(n, prettyText(n))) : []
+        columns ?
+          offeredColumns(columns, picker.kinds).map((c) => columnOption(c, prettyText(c.name)))
+        : []
       return { kind: 'Multiple_Choice', values: [...flags, ...names] }
     }
     case 'Column_Vector': {
@@ -190,6 +210,21 @@ function isPicker(config: WidgetConfiguration): config is ColumnPicker {
   )
 }
 
+/** The `from` of `picker` and of every picker nested in it (`''`: the call's subject), sorted. */
+function pickerSources(picker: ColumnPicker): string[] {
+  const found = new Set<string>()
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) value.forEach(walk)
+    else if (value != null && typeof value === 'object') {
+      if ('kind' in value && isPicker(value as WidgetConfiguration))
+        found.add((value as ColumnPicker).from ?? '')
+      Object.values(value).forEach(walk)
+    }
+  }
+  walk(picker)
+  return [...found].sort()
+}
+
 /** `array` with `f` applied to each element; the same array if no element changed. */
 function mapPreserving<T>(array: T[], f: (item: T) => T): T[] {
   let changed = false
@@ -203,8 +238,8 @@ function mapPreserving<T>(array: T[], f: (item: T) => T): T[] {
 
 /**
  * `config` with every picker reference, at any depth, replaced by its expansion. Memoised per
- * (source schema, picker); `cache` is per opened project. Returns `config` itself if it holds no
- * picker.
+ * (the schemas of every source the picker and the pickers nested in it read, picker); `cache` is per
+ * opened project. Returns `config` itself if it holds no picker.
  */
 export function expandColumnPickers(
   config: WidgetConfiguration,
@@ -216,7 +251,8 @@ export function expandColumnPickers(
     if (!source) return 'absent'
     let key = schemaKeys.get(from)
     if (key == null) {
-      key = JSON.stringify({ names: source.names, kinds: source.kinds })
+      // The type names are shown in the entries, so a type change alone is a new schema.
+      key = JSON.stringify({ names: source.names, kinds: source.kinds, types: source.type_names })
       schemaKeys.set(from, key)
     }
     return key
@@ -248,7 +284,12 @@ function expandWith(
     const source = columns?.[from]
     const compute = () => expandNested(expandPicker(config, source))
     if (cache == null) return compute()
-    return cache.get(schemaKeyOf(from, source), JSON.stringify(config), compute)
+    // Keyed on every source the expansion reads: a picker nested in this one's `extra` may name
+    // another `from`, and its expansion must follow that source too.
+    const schemaKey = pickerSources(config)
+      .map((name) => `${name}=${schemaKeyOf(name, columns?.[name])}`)
+      .join('\n')
+    return cache.get(schemaKey, JSON.stringify(config), compute)
   }
   switch (config.kind) {
     case 'Single_Choice':

@@ -5,6 +5,10 @@
  * the chip is the `Nothing ▼` button standing in for the value, otherwise nothing at all.
  */
 import type { UnionKind } from '$/providers/openedProjects/widgetRegistry/configuration'
+import {
+  focusAfterSwitch,
+  takesFocusAfterSwitch,
+} from '@/components/GraphEditor/widgets/WidgetKindPicker/focusAfterSwitch'
 import { kindIcon } from '@/components/GraphEditor/widgets/WidgetKindPicker/kindIcon'
 import { kindDefaultCode } from '@/components/GraphEditor/widgets/WidgetKindPicker/kindMatch'
 import { pickerMenuStyles } from '@/components/GraphEditor/widgets/WidgetSelection/styles'
@@ -113,36 +117,21 @@ function onMenuKey(e: KeyboardEvent) {
 }
 
 watch(buttonElement, (element) => {
-  // The chip may be a new instance by then (the edit changes the widget tree), hence the module-level record.
-  if (element == null || pendingFocus == null || pendingFocus.node !== tree.externalId) return
-  clearPendingFocus()
-  element.focus()
+  // The chip may be a new instance by then (the edit changes the widget tree), hence the
+  // module-level record in `focusAfterSwitch.ts`.
+  if (element == null) return
+  if (takesFocusAfterSwitch({ node: tree.externalId, kinds: props.kinds, kind: chosen.value }))
+    element.focus()
 })
 
 function onEntry(entry: KindEntry) {
   closeMenu(true)
   if (entry.selected) return
-  // The button stays the same element when both kinds have an icon: nothing is left to wait for.
-  clearPendingFocus()
-  pendingFocus = {
-    node: tree.externalId,
-    timer: setTimeout(() => (pendingFocus = undefined), 1000),
-  }
+  focusAfterSwitch(
+    { node: tree.externalId, kinds: props.kinds, kind: entry.kind },
+    buttonElement.value,
+  )
   props.switchTo(entry.kind)
-}
-</script>
-
-<script lang="ts">
-/**
- * The node whose next chip button to appear takes the focus: a kind was just chosen there, and the
- * Nothing button and the icon button are different elements (of a chip that may itself be new, its
- * port being the new value's), which appear only once the edit has been applied.
- */
-let pendingFocus: { node: unknown; timer: ReturnType<typeof setTimeout> } | undefined
-
-function clearPendingFocus() {
-  if (pendingFocus) clearTimeout(pendingFocus.timer)
-  pendingFocus = undefined
 }
 </script>
 

@@ -24,7 +24,12 @@ const HTTP_STATUS_NO_CONTENT = 204
 const HTTP_STATUS_NOT_FOUND = 404
 const HTTP_STATUS_PAYLOAD_TOO_LARGE = 413
 /** The largest append body: a widget error with its issues is a few KB. */
-const MAX_APPEND_BYTES = 64 * 1024
+export const MAX_APPEND_BYTES = 64 * 1024
+/**
+ * How much of an oversized body is read and dropped after the 413, so that the socket survives to
+ * carry it. Past this the request is destroyed: a client still sending is not waited for.
+ */
+export const MAX_APPEND_DRAIN_BYTES = 1024 * 1024
 
 /** The slice of `http.IncomingMessage` the stream uses. */
 export interface EventStreamRequest {
@@ -244,12 +249,18 @@ export async function handleEngineLogAppend(
   const chunks: Buffer[] = []
   let size = 0
   let answered = false
+  let drained = 0
   try {
     for await (const chunk of request) {
-      // Not `break`: that would destroy the request, and with it the socket the 413 goes out on.
-      // The rest of an oversized body is read and dropped.
-      if (answered) continue
       const buffer = typeof chunk === 'string' ? Buffer.from(chunk) : chunk
+      if (answered) {
+        // Not `break` at once: that destroys the request, and with it the socket the 413 goes out
+        // on. The rest of an oversized body is read and dropped, up to a bound; past it, `break`
+        // ends the iteration, which destroys the request.
+        drained += buffer.length
+        if (drained > MAX_APPEND_DRAIN_BYTES) break
+        continue
+      }
       size += buffer.length
       if (size > MAX_APPEND_BYTES) {
         answered = true

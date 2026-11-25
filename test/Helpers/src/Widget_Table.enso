@@ -1,0 +1,22 @@
+from Standard.Base import all
+
+from Standard.Table import Table
+
+## A table of `width` columns of five kinds (integer, float, text, date,
+   boolean) and `rows` rows, for the widget size tests and benchmarks. A
+   backend that stores dates as text (SQLite) takes `date_as_text`.
+
+   The widget specs of the in-memory table and of SQLite and the widget
+   benchmark share it, so they measure the same table.
+make_table width (rows : Integer = 1000) (date_as_text : Boolean = False) -> Table =
+    columns = 0.up_to width . map i->
+        values = case i % 5 of
+            0 -> 0.up_to rows . map j-> j+i
+            1 -> 0.up_to rows . map j-> (j*0.5)+i
+            2 -> 0.up_to rows . map j-> "t"+(j%50).to_text
+            3 -> 0.up_to rows . map j->
+                date = (Date.new 2020 1 1) + (Period.new days=(j%365))
+                if date_as_text then date.to_text else date
+            _ -> 0.up_to rows . map j-> (j%2)==0
+        ["c"+i.to_text, values]
+    Table.new columns

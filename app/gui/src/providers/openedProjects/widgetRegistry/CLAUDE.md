@@ -29,9 +29,12 @@ how they choose and how a widget query runs).
   argument types before they render (spec §6); `resolverDefault` the resolver of
   a type whose default needs the call (group C: `Simple_Expression`,
   `DuckDB_GeoFormat`, …), which the widget query then runs per call through
-  `type_defaults`.
+  `type_defaults`. After `dispose` (the project closing) a query still in flight
+  records nothing and starts no retry. A frame that answers any type is no
+  longer avoided by the others' retries.
 - `unionKinds.ts` — composing a declared union's widget from its members'
-  (`composeUnion`), dropping a member another converts from.
+  (`composeUnion`), dropping a member another converts from (directly or through
+  other members; of a cycle of conversions the earliest member stays).
 - `columnPickers.ts` — expanding a column picker reference from the answer's
   `columns` block; `SchemaCache` keeps the expansions per schema.
 - `widgetQueryPlan.ts` — pure: what a node's query sends after an answer (only

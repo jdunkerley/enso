@@ -35,6 +35,7 @@ public final class Error {
   private final AtomFactory incomparableValues;
   private final AtomFactory unsupportedArgumentsError;
   private final AtomFactory moduleDoesNotExistError;
+  private final AtomFactory noSuchType;
   private final AtomFactory notInvokable;
   private final AtomFactory noSuchArgument;
   private final AtomFactory missingArgument;
@@ -80,6 +81,7 @@ public final class Error {
     incomparableValues = createErrorsCommon("Incomparable_Values");
     unsupportedArgumentsError = createErrorsCommon("Unsupported_Argument_Types");
     moduleDoesNotExistError = createErrorsCommon("Module_Does_Not_Exist");
+    noSuchType = createErrorsCommon("No_Such_Type");
     notInvokable = createErrorsCommon("Not_Invokable");
     noSuchArgument = createErrorsCommon("No_Such_Argument");
     missingArgument = createErrorsCommon("Missing_Argument");
@@ -303,6 +305,14 @@ public final class Error {
    */
   public Atom makeModuleDoesNotExistError(String name) {
     return moduleDoesNotExistError.newInstance(Text.create(name));
+  }
+
+  /**
+   * @param name the qualified name of the type that is not loaded
+   * @return a no such type error
+   */
+  public Atom makeNoSuchType(String name) {
+    return noSuchType.newInstance(Text.create(name));
   }
 
   /**

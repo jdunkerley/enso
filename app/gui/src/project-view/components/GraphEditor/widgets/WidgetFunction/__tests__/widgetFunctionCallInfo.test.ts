@@ -363,7 +363,7 @@ test('an answer expands its column pickers from the columns it sends', () => {
   })
   expect(info.widgetConfiguration.value.parameters.get('arg')).toEqual({
     kind: 'Single_Choice',
-    values: [{ label: 'A', value: "'A'", parameters: [] }],
+    values: [{ label: 'A', value: "'A'", parameters: [], detail: 'Char' }],
   })
 })
 

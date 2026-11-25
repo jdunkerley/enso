@@ -54,6 +54,23 @@ test('A type default does not narrow a union: File | Enso_Secret offers both', a
   })
 })
 
+test("Under the kind picker, the chosen kind's type default narrows File | Enso_Secret", async () => {
+  const types = [FILE_TYPE_QN, ENSO_SECRET_TYPE_QN].join(' | ')
+  const typeInfo = (dynamicConfig: WidgetConfiguration) =>
+    useBrowserTypeInfo({ reprType: types, dynamicConfig, underKindPicker: true }).value
+  // eslint-disable-next-line camelcase
+  expect(typeInfo(await typeDefaultConfig('File_Browse', { file_types: [] })).types).toEqual({
+    file: true,
+    directory: false,
+    secret: false,
+  })
+  expect(typeInfo(await typeDefaultConfig('Secret_Browse')).types).toEqual({
+    file: false,
+    directory: false,
+    secret: true,
+  })
+})
+
 test.each<TypeInfoCase>([
   {
     description: 'By type, file, constructor required, read',
@@ -149,8 +166,10 @@ test.each<TypeInfoCase>([
         types,
         dynamicConfig: {
           kind: 'File_Browse',
-          // eslint-disable-next-line camelcase
+          /* eslint-disable camelcase */
           existing_only: true,
+          file_types: [],
+          /* eslint-enable camelcase */
         },
       },
       expected: {
@@ -164,8 +183,10 @@ test.each<TypeInfoCase>([
         types,
         dynamicConfig: {
           kind: 'File_Browse',
-          // eslint-disable-next-line camelcase
+          /* eslint-disable camelcase */
           existing_only: false,
+          file_types: [],
+          /* eslint-enable camelcase */
         },
       },
       expected: {

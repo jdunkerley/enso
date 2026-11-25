@@ -39,3 +39,15 @@ test('no Union, no picker (an annotation applies)', () => {
   expect(kindPickerScore(input('42', { kind: 'Numeric_Input' }))).toBe(Score.Mismatch)
   expect(kindPickerScore(input('42'))).toBe(Score.Mismatch)
 })
+test('a Union of no kinds but Nothing: an unset argument is Nothing, any other value steps aside', () => {
+  // `Widget.Union [] include_nothing=True`.
+  const onlyNothing: WidgetConfiguration = {
+    kind: 'Union',
+    kinds: [{ label: 'Nothing', config: null }],
+  }
+  expect(kindPickerScore(input(undefined, onlyNothing))).toBe(Score.Perfect)
+  expect(kindPickerScore(input('Nothing', onlyNothing))).toBe(Score.Perfect)
+  expect(kindPickerScore(input('42', onlyNothing))).toBe(Score.Mismatch)
+  // With no kinds at all (`include_nothing=False`) there is no picker.
+  expect(kindPickerScore(input(undefined, { kind: 'Union', kinds: [] }))).toBe(Score.Mismatch)
+})

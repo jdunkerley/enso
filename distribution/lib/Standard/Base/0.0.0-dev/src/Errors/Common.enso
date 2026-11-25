@@ -502,6 +502,24 @@ type Module_Does_Not_Exist
     to_display_text : Text
     to_display_text self = "Module "+self.name+" does not exist."
 
+type No_Such_Type
+    ## ---
+       private: true
+       ---
+       An error that occurs when no type (nor module) of the given qualified
+       name is loaded.
+
+       ## Arguments
+        - `name`: The qualified name of the type searched for.
+    Error name
+
+    ## ---
+       private: true
+       ---
+       Convert the No_Such_Type error to a human-readable format.
+    to_display_text : Text
+    to_display_text self = "Type "+self.name+" does not exist."
+
 type Invalid_Conversion_Target
     ## ---
        private: true

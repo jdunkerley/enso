@@ -8,6 +8,7 @@ import {
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
 import { isTypeDefault } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
+import { unionMembers } from '$/providers/openedProjects/widgetRegistry/unionKinds'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import {
   SUPPORTED_DYNAMIC_CONFIG_KINDS,
@@ -36,6 +37,7 @@ const reprType = computed(() => props.input[ArgumentInfoKey]?.info?.reprType)
 const typeInfo = useBrowserTypeInfo({
   reprType,
   dynamicConfig: () => props.input.dynamicConfig,
+  underKindPicker: () => props.input[UnderKindPickerKey] === true,
 })
 
 const currentPathAst = useCurrentPath({
@@ -101,11 +103,14 @@ const innerWidgetInput = computed(() => withBrowserItems(props.input, items.valu
 
 <script lang="ts">
 /**
- * Perfect for a browse configuration. A declared browsable type claims an input too when its
- * configuration is not a type default but an annotation's options, an annotation's text input, or
- * one still pending: the browse items join the options, or sit in a dropdown over the text input, as
- * before the kind picker. `Data.read`'s `path` (`Text | URI | File`, `@path (Text_Input)`) is the
- * text input case. Never from the type alone, which the kind picker and the type defaults own.
+ * Perfect for a browse configuration, whatever the value: a type default's too, so an argument or
+ * a vector item of type `File` holding a reference keeps a ▾ over its code to pick a file instead.
+ * A declared browsable type claims an input too when its configuration is not a type default but an
+ * annotation's options, an annotation's text input, or one still pending: the browse items join the
+ * options, or sit in a dropdown over the text input, as before the kind picker. `Data.read`'s `path`
+ * (`Text | URI | File`, `@path (Text_Input)`) is the text input case. Never from the type alone,
+ * which the kind picker and the type defaults own. The declared type must name a browsable type as
+ * one of its union members, exactly: `Vector File` is not one.
  */
 function browseScore(input: WidgetInput): Score {
   const config = input.dynamicConfig
@@ -118,7 +123,7 @@ function browseScore(input: WidgetInput): Score {
         !isTypeDefault(config) &&
         input[UnderKindPickerKey] !== true &&
         reprType &&
-        SUPPORTED_TYPES.some((type) => reprType.includes(type))
+        unionMembers(reprType).some((member) => SUPPORTED_TYPES.includes(member))
     ) ?
       Score.Perfect
     : Score.Mismatch

@@ -184,7 +184,10 @@ result = "not a number".parse_integer.catch _-> 0
   widgets).
 - `Meta.Type.find` prefers a module to a type of the same name:
   `Standard.Table.Table.Table` finds the module. `Meta.find_type_or_module` asks
-  for the type first and falls back to the module.
+  for the type first and falls back to the module; a name that is neither is a
+  `No_Such_Type` error (as is an unknown type in `Meta.get_method_annotation`
+  and `Meta.get_method_argument_names`), which `Widget_Query` reports at step
+  `"lookup"`.
 
 ## Things to avoid in generated code
 

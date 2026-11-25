@@ -9,10 +9,12 @@ import {
 import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
 import {
   defaultItemCode,
-  vectorItemDefault,
   vectorElementType,
   vectorItemConfig,
+  vectorItemKind,
 } from '@/components/GraphEditor/widgets/WidgetVector/elementType'
+import { kindDefaultCode } from '@/components/GraphEditor/widgets/WidgetKindPicker/kindMatch'
+import { useKindImports } from '@/components/GraphEditor/widgets/WidgetKindPicker/kindImports'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import DraggableList from '@/components/widgets/DraggableList.vue'
 import { injectGraphNavigator } from '@/providers/graphNavigator'
@@ -26,14 +28,14 @@ const props = defineProps(widgetProps(widgetDefinition))
 const project = useCurrentProject()
 const tree = injectWidgetTree()
 
-function doEdit(editFn: (ast: Ast.MutableVector) => void) {
+function doEdit(editFn: (ast: Ast.MutableVector, edit: Ast.MutableModule) => void) {
   project.module.value.edit((edit) => {
     if (props.input.value instanceof Ast.Vector) {
-      editFn(edit.getVersion(props.input.value))
+      editFn(edit.getVersion(props.input.value), edit)
       return props.updateCallback({ edit, directInteraction: true })
     } else {
       const value = Ast.Vector.new(MutableModule.Transient(), [])
-      editFn(value)
+      editFn(value, edit)
       return props.updateCallback({
         edit,
         portUpdate: { value, origin: props.input.portId },
@@ -61,16 +63,35 @@ const itemConfig = computed(() =>
   ),
 )
 
+// Asked as soon as the vector is drawn: an empty one draws no item that would ask, and its first ＋
+// would otherwise find the items' type default still unknown and write `_`.
+watchEffect(() => void itemConfig.value)
+
+/** The kind a new item is written as, when no annotation's `item_default` says what to write. */
+const defaultItemKind = computed(() =>
+  props.input.dynamicConfig?.kind === 'Vector_Editor' ?
+    undefined
+  : vectorItemKind(itemConfig.value),
+)
+
 const defaultItem = computed(() => {
   if (props.input.dynamicConfig?.kind === 'Vector_Editor')
     return Ast.parseExpression(props.input.dynamicConfig.item_default) ?? DEFAULT_ITEM.value
-  const typed = vectorItemDefault(itemConfig.value) ?? defaultItemCode(itemType.value)
+  const typed =
+    (defaultItemKind.value !== undefined ? kindDefaultCode(defaultItemKind.value) : undefined) ??
+    defaultItemCode(itemType.value)
   return (typed != null ? Ast.parseExpression(typed) : undefined) ?? DEFAULT_ITEM.value
 })
 
+const addKindImports = useKindImports()
+
 function handleAddItem() {
   if (props.input.editHandler?.addItem()) return
-  doEdit((ast) => ast.push(defaultItem.value))
+  doEdit((ast, edit) => {
+    // The kind's imports, as switching to that kind in the picker adds them.
+    addKindImports(edit, defaultItemKind.value)
+    ast.push(defaultItem.value)
+  })
 }
 
 function handleRemove(index: number) {
