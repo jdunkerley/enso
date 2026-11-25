@@ -563,6 +563,15 @@ let mockTypeDefaults: Map<string, unknown> = new Map(Object.entries(initialMockT
 
 /** The types `resolve_type` was asked about, in order, since the last reset. */
 const typeDefaultQueries: string[] = []
+/** How long `resolve_type` takes to answer, standing in for the engine's round trip. */
+let typeDefaultDelayMs = 0
+/** The request each slot holds a delayed `resolve_type` answer for, so it is asked and counted once. */
+const delayedTypeDefaults = new WeakMap<YMap<unknown>, unknown>()
+
+/** Make `resolve_type` answer `delayMs` after it is asked (0, the default, answers at once). */
+export function setMockTypeDefaultDelay(delayMs: number) {
+  typeDefaultDelayMs = delayMs
+}
 
 /** Set the answer `resolve_type` gives for `type` (`{ widget: null }` for none). */
 export function updateMockTypeDefault(type: string, answer: unknown) {
@@ -600,6 +609,7 @@ export function restoreMockWidgetConfigurations() {
 function resetTypeDefaults() {
   mockTypeDefaults = new Map(Object.entries(initialMockTypeDefaults))
   typeDefaultQueries.length = 0
+  typeDefaultDelayMs = 0
   resetResolverMocks()
 }
 
@@ -1143,8 +1153,19 @@ function maybeRespondToSlot(slot: YMap<unknown>): void {
     maybeAnswerResolverQuery(slot, request, key)
   )
     return
+  const delayed = typeDefaultDelayMs > 0 && key.startsWith(RESOLVE_TYPE_KEY)
+  // Every change to the slots visits each pending slot again: a delayed answer is already on its way.
+  if (delayed && delayedTypeDefaults.get(slot) === request) return
   const bytes = responseBytesFor(key, slotPositionalArgs(request))
-  if (bytes) writeSlotResponse(slot, isWidgetQuery(request) ? asWidgetAnswer(bytes) : bytes)
+  if (!bytes) return
+  const response = isWidgetQuery(request) ? asWidgetAnswer(bytes) : bytes
+  if (delayed) {
+    delayedTypeDefaults.set(slot, request)
+    setTimeout(() => {
+      // A newer request replaced this one meanwhile: the engine would answer that one instead.
+      if (slot.get(VIS_SLOT_FIELDS.request) === request) writeSlotResponse(slot, response)
+    }, typeDefaultDelayMs)
+  } else writeSlotResponse(slot, response)
 }
 
 /**

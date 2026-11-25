@@ -49,13 +49,13 @@ export const MAX_RETRY_DELAY_MS = 30000
  * (the expressions of the graph shown) that is; never one of `avoid`.
  */
 export function chooseComputedFrame(
-  preferred: ExternalId,
+  preferred: ExternalId | undefined,
   avoid: ReadonlySet<ExternalId>,
   candidates: Iterable<ExternalId>,
   isComputed: (frame: ExternalId) => boolean,
 ): ExternalId | undefined {
   const usable = (frame: ExternalId) => !avoid.has(frame) && isComputed(frame)
-  if (usable(preferred)) return preferred
+  if (preferred != null && usable(preferred)) return preferred
   for (const frame of candidates) if (usable(frame)) return frame
   return undefined
 }
@@ -134,7 +134,7 @@ export class TypeDefaults {
      * is none.
      */
     private readonly pickFrame: (
-      preferred: ExternalId,
+      preferred: ExternalId | undefined,
       avoid: ReadonlySet<ExternalId>,
     ) => ExternalId | undefined,
     private readonly projectId: string,
@@ -198,6 +198,27 @@ export class TypeDefaults {
     return entry?.state === 'resolver' ? entry.resolver : undefined
   }
 
+  /**
+   * Start asking the default widgets of the declared types `reprTypes` (each member of a union)
+   * that are neither known nor being asked. For when a method is first shown (the component browser
+   * selects it, a node's call becomes known), so that its arguments' widgets are known when they
+   * render. Reads nothing reactively. `frame` is preferred as in {@link lookup}; without one, any
+   * computed expression of the graph asks.
+   */
+  prefetch(reprTypes: Iterable<string | undefined>, frame?: ExternalId) {
+    pauseTracking()
+    try {
+      for (const reprType of reprTypes) {
+        if (reprType == null) continue
+        for (const type of unionMembers(reprType)) {
+          if (type !== NOTHING_TYPE && !toRaw(this.cache).has(type)) this.entry(type, frame)
+        }
+      }
+    } finally {
+      resetTracking()
+    }
+  }
+
   private lookupType(type: string, frame: ExternalId): WidgetConfiguration | undefined | 'pending' {
     const entry = this.entry(type, frame)
     if (entry == null) return undefined
@@ -206,7 +227,7 @@ export class TypeDefaults {
   }
 
   /** The cache entry of a type with a `Widget.from` conversion, asking for it when not known. */
-  private entry(type: string, frame: ExternalId): CacheEntry | undefined {
+  private entry(type: string, frame: ExternalId | undefined): CacheEntry | undefined {
     if (!this.hasDefault(type)) return undefined
     const entry = this.cache.get(type)
     if (entry == null) {
@@ -238,7 +259,7 @@ export class TypeDefaults {
   }
 
   /** Picks the frame without making the calling computed depend on what it reads. */
-  private chooseFrame(type: string, preferred: ExternalId): ExternalId | undefined {
+  private chooseFrame(type: string, preferred: ExternalId | undefined): ExternalId | undefined {
     const failed = this.failedFrames.get(type) ?? new Set<ExternalId>()
     pauseTracking()
     try {
@@ -252,7 +273,7 @@ export class TypeDefaults {
     }
   }
 
-  private async ask(type: string, preferredFrame: ExternalId) {
+  private async ask(type: string, preferredFrame: ExternalId | undefined) {
     let result: Result<unknown> | null
     let frame: ExternalId | undefined
     try {

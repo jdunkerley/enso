@@ -8,13 +8,14 @@ import {
   restoreMockWidgetConfigurations,
   setMockMainFile,
   setMockResolverAnswer,
+  setMockTypeDefaultDelay,
   typeDefaultQueryCount,
   widgetQueriesOf,
   widgetQueryCount,
   type MockWidgetQuery,
 } from 'integration-test/mock/lsHandler'
 import * as actions from './actions'
-import { mockMethodCallInfo } from './expressionUpdates'
+import { mockExpressionUpdate, mockMethodCallInfo } from './expressionUpdates'
 import * as locate from './locate'
 
 class DropDownLocator {
@@ -2267,6 +2268,39 @@ test.describe('Type defaults from the library', () => {
     await expect(locate.graphNodeByBinding(page, 'limited').locator('.WidgetNumber')).toHaveCount(1)
     // The union was reduced to its first member in the request.
     expect(typeDefaultQueryCount('Standard.Base.Data.Numbers.Integer')).toBe(1)
+  })
+
+  // Spec §6: a method's argument types are asked when it is first shown, so a node placed from the
+  // component browser does not show its bare argument name for one more engine round trip.
+  test("the component browser asks the shown entry's argument types before the node is placed", async ({
+    editorPage,
+    page,
+  }) => {
+    const LOCALE = 'Standard.Base.Data.Locale.Locale'
+    // A slow engine: the answer must be asked for early to be there when the node's call is known.
+    setMockTypeDefaultDelay(500)
+    await editorPage.mockSuggestion(
+      staticMethod('pick_locale', {
+        name: 'locale',
+        reprType: LOCALE,
+        isSuspended: false,
+        hasDefault: false,
+      }),
+    )
+    // A computed frame to ask in.
+    await mockExpressionUpdate(page, 'first', {})
+    await locate.addNewNodeButton(page).click()
+    await locate.componentBrowserInput(page).fill('pick_loc')
+    await expect(locate.componentBrowserSelectedEntry(page)).toHaveText('Data.pick_locale')
+    await expect.poll(() => typeDefaultQueryCount(LOCALE)).toBe(1)
+    await page.keyboard.press('Enter')
+    await expect(locate.componentBrowser(page)).toBeHidden()
+    const node = locate.graphNode(page).filter({ hasText: 'pick_locale' })
+    const binding = (await node.locator('.binding').textContent())?.trim()
+    expect(binding).toBeTruthy()
+    await mockMethodCallInfo(page, binding!, pointer('pick_locale'))
+    await expect(node.locator('.WidgetSelection')).toHaveCount(1)
+    expect(typeDefaultQueryCount(LOCALE)).toBe(1)
   })
 
   test("a nested call's date argument gets the picker", async ({ editorPage, page }) => {

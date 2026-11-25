@@ -91,7 +91,8 @@ export function useWidgetFunctionCallInfo(
   projectNames: ToValue<ProjectNameStore>,
   groups: ToValue<DeepReadonly<GroupInfo[]>>,
   typeDefaults?: ToValue<
-    (Pick<TypeDefaults, 'lookup'> & Partial<Pick<TypeDefaults, 'resolverDefault'>>) | undefined
+    | (Pick<TypeDefaults, 'lookup'> & Partial<Pick<TypeDefaults, 'resolverDefault' | 'prefetch'>>)
+    | undefined
   >,
   schemaCache?: ToValue<SchemaCache | undefined>,
   staticAnswers?: ToValue<StaticAnswerCache | undefined>,
@@ -198,6 +199,20 @@ export function useWidgetFunctionCallInfo(
   // A type's query does not read the frame's value either: its node is a frame the engine answers
   // in at once (Note [A Query With No Subject Hangs On Its Node]).
   const callFrame = computed(() => subjectlessQueryFrame(toValue(input).value, toValue(graphDb)))
+
+  // Once the call is known, the default widgets of all its arguments' types are asked, the
+  // arguments not shown included, so that one added later (＋) has its widget at once.
+  watch(
+    () => methodCallInfo.value?.suggestion,
+    (suggestion) => {
+      if (suggestion == null) return
+      toValue(typeDefaults)?.prefetch?.(
+        suggestion.arguments.map((argument) => argument.reprType),
+        callFrame.value,
+      )
+    },
+    { immediate: true },
+  )
 
   /**
    * The arguments the query resolves: the annotated ones, then those without an annotation whose
