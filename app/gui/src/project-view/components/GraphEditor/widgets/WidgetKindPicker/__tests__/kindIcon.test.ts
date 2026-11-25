@@ -9,13 +9,12 @@ import { expect, test } from 'vitest'
 const kind = (label: string, config: WidgetConfiguration | null): UnionKind => ({ label, config })
 
 /* eslint-disable camelcase */
-const cases: [string, UnionKind, string | undefined][] = [
-  ['Nothing', kind('Nothing', null), undefined],
-  ['File_Browse', kind('Writable_File', { kind: 'File_Browse' }), 'document'],
-  ['Folder_Browse', kind('Folder', { kind: 'Folder_Browse' }), 'folder'],
-  ['Secret_Browse', kind('Secret', { kind: 'Secret_Browse' }), 'key'],
+const cases: [UnionKind, string | undefined][] = [
+  [kind('Nothing', null), undefined],
+  [kind('Writable_File', { kind: 'File_Browse', file_types: [] }), 'document'],
+  [kind('Folder', { kind: 'Folder_Browse' }), 'folder'],
+  [kind('Secret', { kind: 'Secret_Browse' }), 'key'],
   [
-    'Vector_Editor',
     kind('Vector', {
       kind: 'Vector_Editor',
       item_editor: { kind: 'Text_Input' },
@@ -23,22 +22,29 @@ const cases: [string, UnionKind, string | undefined][] = [
     }),
     'array_new',
   ],
-  ['Regex_Input', kind('Regex', { kind: 'Regex_Input' }), 'regex'],
-  ['Text_Input', kind('Text', { kind: 'Text_Input' }), 'text_input'],
-  ['Boolean_Input', kind('Boolean', { kind: 'Boolean_Input' }), 'toggle'],
-  ['Date_Input', kind('Date', { kind: 'Date_Input' }), 'calendar'],
-  ['Time_Input', kind('Time_Of_Day', { kind: 'Time_Input' }), 'time'],
-  ['Date_Time_Input', kind('Date_Time', { kind: 'Date_Time_Input' }), 'datetime'],
-  ['Integer', kind('Integer', { kind: 'Numeric_Input' }), 'input_number'],
-  ['Positive_Integer', kind('Positive_Integer', { kind: 'Numeric_Input' }), 'input_number'],
-  ['Float', kind('Float', { kind: 'Numeric_Input' }), 'input_decimal'],
-  ['Number', kind('Number', { kind: 'Numeric_Input' }), 'input_decimal'],
-  ['Single_Choice', kind('Choice', { kind: 'Single_Choice', values: [] }), undefined],
+  [kind('Regex', { kind: 'Regex_Input' }), 'regex'],
+  [kind('Text', { kind: 'Text_Input' }), 'text_input'],
+  [kind('Boolean', { kind: 'Boolean_Input' }), 'toggle'],
+  [kind('Date', { kind: 'Date_Input' }), 'calendar'],
+  [kind('Time_Of_Day', { kind: 'Time_Input' }), 'time'],
+  [kind('Date_Time', { kind: 'Date_Time_Input' }), 'datetime'],
+  [kind('Integer', { kind: 'Numeric_Input' }), 'input_number'],
+  [kind('Positive_Integer', { kind: 'Numeric_Input' }), 'input_number'],
+  [kind('Float', { kind: 'Numeric_Input' }), 'input_decimal'],
+  [kind('Number', { kind: 'Numeric_Input' }), 'input_decimal'],
+  [kind('Choice', { kind: 'Single_Choice', values: [] }), undefined],
 ]
 
 /* eslint-enable camelcase */
 
-test.each(cases)('%s', (_name, k, expected) => {
+// The title names what decides the icon: the widget kind, and for a number the kind's label too.
+test.each(
+  cases.map(([k, expected]) => ({
+    title: `${k.label} (${k.config?.kind ?? 'Nothing'}) → ${expected ?? 'no icon, the label'}`,
+    k,
+    expected,
+  })),
+)('$title', ({ k, expected }) => {
   expect(kindIcon(k)).toBe(expected)
   if (expected !== undefined) expect(iconNames).toContain(expected)
 })

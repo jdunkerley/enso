@@ -1,6 +1,11 @@
 /** @file The element type of a `Vector`-typed argument. */
 import { describe, expect, test } from 'vitest'
-import { defaultItemCode, vectorElementType, vectorItemDefault } from '../elementType'
+import {
+  defaultItemCode,
+  vectorElementType,
+  vectorItemDefault,
+  vectorItemKind,
+} from '../elementType'
 
 const DATE = 'Standard.Base.Data.Time.Date.Date'
 const VECTOR = 'Standard.Base.Data.Vector.Vector'
@@ -80,4 +85,21 @@ test.each([
   [undefined, undefined],
 ] as const)('vectorItemDefault(%o)', (config, expected) => {
   expect(vectorItemDefault(config as never)).toBe(expected)
+})
+
+test('vectorItemKind is the kind whose default (and imports) a new item takes', () => {
+  const secret = { kind: 'Secret_Browse' } as const
+  const union = {
+    kind: 'Union',
+    kinds: [
+      { label: 'Odd', config: { kind: 'Any_To_Target' } },
+      { label: 'Enso_Secret', config: secret },
+      { label: 'Text', config: { kind: 'Text_Input' } },
+    ],
+  } as const
+  expect(vectorItemKind(union as never)).toBe(secret)
+  expect(vectorItemKind(secret)).toBe(secret)
+  expect(vectorItemKind({ kind: 'Any_To_Target' })).toBeUndefined()
+  expect(vectorItemKind({ kind: 'Union', kinds: [{ label: 'Nothing', config: null }] })).toBeNull()
+  expect(vectorItemDefault(union as never)).toBe("Enso_Secret.get ''")
 })

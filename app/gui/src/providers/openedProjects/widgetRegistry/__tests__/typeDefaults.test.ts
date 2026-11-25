@@ -411,3 +411,115 @@ test('a static default is no resolver default', async () => {
   await flushPromises()
   expect(defaults.resolverDefault(DATE, frameA)).toBeUndefined()
 })
+
+test('a lookup in a computed re-runs as soon as the answer arrives, with no timer', async () => {
+  let answer!: (value: Result<unknown>) => void
+  const query = vi.fn<Query>(() => new Promise((resolve) => (answer = resolve)))
+  const defaults = make(() => true, query)
+  const scope = effectScope()
+  const config = scope.run(() => computed(() => defaults.lookup(DATE, frameA)))!
+  expect(config.value).toBeUndefined()
+  answer(WIDGET)
+  await flushPromises()
+  expect(vi.getTimerCount()).toBe(0)
+  expect(config.value).toEqual({ kind: 'Date_Input' })
+  expect(query).toHaveBeenCalledTimes(1)
+  scope.stop()
+})
+
+test('two types asked at once settle independently', async () => {
+  const pending = new Map<string, (value: Result<unknown> | null) => void>()
+  const query = vi.fn<Query>(
+    (_frame, code) =>
+      new Promise((resolve) => pending.set(code.includes(`'${DATE}'`) ? DATE : TEXT, resolve)),
+  )
+  const defaults = make(() => true, query)
+  const scope = effectScope()
+  const date = scope.run(() => computed(() => defaults.lookup(DATE, frameA)))!
+  const text = scope.run(() => computed(() => defaults.lookup(TEXT, frameA)))!
+  expect([date.value, text.value]).toEqual([undefined, undefined])
+  expect(query).toHaveBeenCalledTimes(2)
+  // Text fails first; Date answers while Text waits for its retry.
+  pending.get(TEXT)!(null)
+  await flushPromises()
+  pending.get(DATE)!(WIDGET)
+  await flushPromises()
+  expect([date.value, text.value]).toEqual([{ kind: 'Date_Input' }, undefined])
+  query.mockResolvedValueOnce(Ok({ widget: { constructor: 'Text_Input' } }))
+  vi.advanceTimersByTime(RETRY_DELAY_MS)
+  expect(text.value).toBeUndefined() // asks again
+  await flushPromises()
+  expect([date.value, text.value]).toEqual([{ kind: 'Date_Input' }, { kind: 'Text_Input' }])
+  expect(query).toHaveBeenCalledTimes(3)
+  scope.stop()
+})
+
+test('choosing the frame does not make the lookup depend on what the frame pick reads', async () => {
+  const computedFrames = reactive(new Set<ExternalId>([frameA]))
+  const pick = (preferred: ExternalId) => (computedFrames.has(preferred) ? preferred : undefined)
+  const query = vi.fn<Query>(() => new Promise(() => {})) // never answers
+  const defaults = make(() => true, query, pick)
+  const scope = effectScope()
+  const runs = vi.fn()
+  const config = scope.run(() =>
+    computed(() => {
+      runs()
+      return defaults.lookup(DATE, frameA)
+    }),
+  )!
+  void config.value
+  expect(query).toHaveBeenCalledWith(frameA, RESOLVE_TYPE_EXPRESSION(DATE))
+  computedFrames.add(frameB)
+  computedFrames.delete(frameA)
+  void config.value
+  expect(runs).toHaveBeenCalledTimes(1)
+  scope.stop()
+})
+
+test('a query in flight when the instance is disposed starts no retry timer', async () => {
+  let answer!: (value: Result<unknown> | null) => void
+  const query = vi.fn<Query>(() => new Promise((resolve) => (answer = resolve)))
+  const defaults = make(() => true, query)
+  defaults.lookup(DATE, frameA)
+  defaults.dispose()
+  answer(null)
+  await flushPromises()
+  expect(vi.getTimerCount()).toBe(0)
+  vi.advanceTimersByTime(MAX_RETRY_DELAY_MS)
+  expect(query).toHaveBeenCalledTimes(1)
+})
+
+test('a frame that answers another type is no longer avoided', async () => {
+  const query = vi.fn<Query>(answerFor({ [TEXT]: { widget: { constructor: 'Text_Input' } } }))
+  // Date fails in A (no result yet), then would be asked in B instead.
+  query.mockResolvedValueOnce(null)
+  const pick = vi.fn((preferred: ExternalId, avoid: ReadonlySet<ExternalId>) =>
+    [preferred, frameB].find((frame) => !avoid.has(frame)),
+  )
+  const defaults = make(() => true, query, pick)
+  defaults.lookup(DATE, frameA)
+  await flushPromises()
+  // Text answers in A: A works now, so Date's retry asks there again.
+  defaults.lookup(TEXT, frameA)
+  await flushPromises()
+  vi.advanceTimersByTime(RETRY_DELAY_MS)
+  defaults.lookup(DATE, frameA)
+  await flushPromises()
+  expect(query.mock.calls.map(([frame, code]) => [frame, code.includes(`'${DATE}'`)])).toEqual([
+    [frameA, true],
+    [frameA, false],
+    [frameA, true],
+  ])
+})
+
+test('the type name is written as an escaped text literal', async () => {
+  const { Ast } = await import('@/util/ast')
+  const expression = Ast.parseExpression(RESOLVE_TYPE_EXPRESSION("My.Type'Name"))!
+  const { args } = Ast.analyzeAppLike(expression)
+  const name = args.at(-1)
+  expect(name).toBeInstanceOf(Ast.TextLiteral)
+  expect((name as Ast.TextLiteral).rawTextContent).toBe("My.Type'Name")
+  expect(RESOLVE_TYPE_EXPRESSION(DATE)).toBe(
+    `Standard.Base.Meta.call_module_method 'Standard.Base.Metadata.Widget_Query' 'resolve_type' [] '${DATE}'`,
+  )
+})

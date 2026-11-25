@@ -7,24 +7,36 @@ import type { Choice, UnionKind, WidgetConfiguration } from './configuration'
 
 export const NOTHING_TYPE = 'Standard.Base.Nothing.Nothing'
 
-/** Remove balanced parentheses wrapping the whole text, as many layers as there are. */
-function stripOuterParentheses(text: string): string {
+/**
+ * Remove balanced parentheses wrapping the whole text, as many layers as there are: `((a b))` gives
+ * `a b`, while `(a) + (b)` is left as it is. Parentheses inside a text literal (`'…'`, `"…"`) are not
+ * counted. Used on type names and on the code of choice values.
+ */
+export function stripOuterParentheses(text: string): string {
   let result = text.trim()
-  while (result.startsWith('(') && result.endsWith(')')) {
-    let depth = 0
-    let wraps = true
-    for (let i = 0; i < result.length - 1; i++) {
-      if (result[i] === '(') depth++
-      else if (result[i] === ')') depth--
-      if (depth === 0) {
-        wraps = false
-        break
-      }
-    }
-    if (!wraps) break
+  while (
+    result.startsWith('(') &&
+    result.endsWith(')') &&
+    closingOfFirst(result) === result.length - 1
+  )
     result = result.slice(1, -1).trim()
-  }
   return result
+}
+
+/** The index of the `)` closing the `(` at index 0, or -1 if none does. */
+function closingOfFirst(code: string): number {
+  let depth = 0
+  let quote: string | undefined
+  for (let i = 0; i < code.length; i++) {
+    const char = code[i]
+    if (quote != null) {
+      if (char === '\\') i++
+      else if (char === quote) quote = undefined
+    } else if (char === "'" || char === '"') quote = char
+    else if (char === '(') depth++
+    else if (char === ')' && --depth === 0) return i
+  }
+  return -1
 }
 
 /**
@@ -71,8 +83,9 @@ export function kindLabel(typeName: string): string {
  * - `'pending'` while any member is pending;
  * - `Nothing` is a kind of its own, never absorbed and never absorbing;
  * - members without a widget are dropped (and absorb nothing);
- * - a member A is dropped when another member B with a widget has `converts(A, B)`; of two members
- *   converting to each other the earlier stays; if every member would go, the first stays;
+ * - a member A is dropped when another member B with a widget has `converts(A, B)`, directly or
+ *   through other members, and B does not convert back; of members that all convert to each other
+ *   (two, or a cycle of more) the earliest stays; if every member would go, the first stays;
  * - members with deep-equal widgets collapse into the first;
  * - every remaining non-Nothing kind a `Single_Choice` → one merged `Single_Choice` (`Nothing` an option;
  *   it keeps the first kind's other fields);
@@ -89,12 +102,17 @@ export function composeUnion(
     (member): member is MemberWidget & { config: WidgetConfiguration } =>
       member.typeName !== NOTHING_TYPE && member.config != null && member.config !== 'pending',
   )
-  const survivors = withWidget.filter((a, i) => {
-    return !withWidget.some(
-      (b, j) =>
-        j !== i && converts(a.typeName, b.typeName) && !(converts(b.typeName, a.typeName) && j > i),
-    )
-  })
+  // `reach[i][j]`: member i converts to member j, directly or through other members.
+  const reach = withWidget.map((a) =>
+    withWidget.map((b) => a !== b && converts(a.typeName, b.typeName)),
+  )
+  for (let k = 0; k < reach.length; k++)
+    for (const row of reach) if (row[k]) row.forEach((_, j) => (row[j] ||= reach[k]![j]!))
+  // A member goes when it reaches one that does not convert back (that one absorbs it), and among
+  // members that all reach each other (a cycle of conversions) only the earliest stays.
+  const survivors = withWidget.filter(
+    (_, i) => !reach[i]!.some((reaches, j) => reaches && (!reach[j]![i] || j < i)),
+  )
   const remaining = survivors.length > 0 ? survivors : withWidget.slice(0, 1)
 
   const kinds: (UnionKind & { config: WidgetConfiguration })[] = []

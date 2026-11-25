@@ -95,13 +95,19 @@ function minNonNegative(a: number, b: number) {
   )
 }
 
-/** Determines the type(s) of browsable items. */
+/**
+ * Determines the type(s) of browsable items. A type default does not narrow the declared type,
+ * except under the kind picker (`underKindPicker`), where it is the chosen kind's own widget: the
+ * File kind of `File | Enso_Secret` browses files only, its Secret kind secrets only.
+ */
 export function useBrowserTypeInfo({
   reprType,
   dynamicConfig,
+  underKindPicker = false,
 }: {
   reprType: ToValue<string | undefined>
   dynamicConfig: ToValue<WidgetConfiguration | undefined>
+  underKindPicker?: ToValue<boolean>
 }): ComputedRef<BrowserTypeInfo> {
   const reprTypeInfo = computed(() => {
     const type = toValue(reprType)
@@ -124,9 +130,10 @@ export function useBrowserTypeInfo({
   const SECRET_ONLY = { file: false, directory: false, secret: true }
 
   return computed((): BrowserTypeInfo => {
-    // A type default says nothing the declared type does not: it must not narrow a union.
+    // A type default says nothing the declared type does not: it must not narrow a union, unless
+    // the kind picker has chosen that member.
     const given = toValue(dynamicConfig)
-    const config = isTypeDefault(given) ? undefined : given
+    const config = isTypeDefault(given) && !toValue(underKindPicker) ? undefined : given
     switch (config?.kind) {
       case 'File_Browse':
         return {
