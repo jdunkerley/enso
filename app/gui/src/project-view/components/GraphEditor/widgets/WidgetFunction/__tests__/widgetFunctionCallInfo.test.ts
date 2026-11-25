@@ -393,8 +393,11 @@ function setUpResolverQuery(
   })
   const statement = ast.lines[0]?.statement?.node
   assert(statement instanceof Ast.ExpressionStatement)
-  // Computed values by expression id; a new payload object is a recomputed value.
+  // Computed values by expression id; a node's under `node:<its binding>`. As the engine does, an
+  // update replaces the payload object whether or not the value changed (#961).
   const values = reactive(new Map<string, { payload: { type: 'Value' } }>())
+  const codes = new Map<string, string>()
+  Ast.visitRecursive(statement.expression, (ast) => void codes.set(ast.externalId, ast.code()))
   const queries: (() => Opt<NodeVisualizationConfiguration>)[] = []
   const data = [shallowRef<Result<unknown> | null>(null), shallowRef<Result<unknown> | null>(null)]
   const scope = effectScope()
@@ -414,6 +417,7 @@ function setUpResolverQuery(
         getExpressionInfo(exprId) {
           return values.get(exprId as string) as never
         },
+        getIdentDefiningNode: (ident) => `node:${ident}` as never,
         getExpressionNodeId: () => undefined,
         isNodeUsage: () => false,
       } as GraphDb,
@@ -439,7 +443,13 @@ function setUpResolverQuery(
     JSON.parse(literal(nodeQuery()?.positionalArgumentsExpressions?.[4]))
   /** Expression ids of the call's arguments, as the first query sent them all. */
   const argumentIds: Record<string, string> = nodeQuery() != null ? sentUuids() : {}
-  const recompute = (name: string) => values.set(argumentIds[name]!, { payload: { type: 'Value' } })
+  /** The engine sends an argument's value again, unchanged (it does after every query). */
+  const resend = (name: string) => values.set(argumentIds[name]!, { payload: { type: 'Value' } })
+  /** The node an argument names is recomputed, and the argument's value sent again with it. */
+  const recompute = (name: string) => {
+    values.set(`node:${codes.get(argumentIds[name]!)}`, { payload: { type: 'Value' } })
+    resend(name)
+  }
   const answer = (value: unknown) => (data[0]!.value = Ok(value))
   const answerSearch = (value: unknown) => (data[1]!.value = Ok(value))
   const param = (name: string) => info.widgetConfiguration.value.parameters.get(name)
@@ -452,6 +462,7 @@ function setUpResolverQuery(
     searchQuery,
     sentUuids,
     argumentIds,
+    resend,
     recompute,
     answer,
     answerSearch,
@@ -481,6 +492,29 @@ describe('the query follows the declared dependencies', () => {
     expect(revision).not.toBe('')
     q.recompute('right')
     expect(q.revision()).not.toBe(revision)
+  })
+
+  test("the engine sending a dependency's unchanged value again asks nothing (#961)", () => {
+    const q = setUpResolverQuery('val1.join val2 val3 val4', join)
+    q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
+    q.recompute('right')
+    const query = q.nodeQuery()
+    q.answer({
+      arguments: [['on', { widget: boolInput, resolver: onResolver }]],
+      revision: q.revision(),
+    })
+    expect(q.nodeQuery()).toBe(query)
+    q.resend('right')
+    q.resend('right')
+    expect(q.nodeQuery()).toBe(query)
+  })
+
+  test('a literal dependency re-queries only when its code changes', () => {
+    const q = setUpResolverQuery("val1.join 'c0' val3 val4", join)
+    q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
+    const query = q.nodeQuery()
+    q.resend('right')
+    expect(q.nodeQuery()).toBe(query)
   })
 
   test('changing `join_kind` does not change the query', () => {

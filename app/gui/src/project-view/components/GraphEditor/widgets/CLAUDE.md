@@ -265,12 +265,15 @@ render only its own slot content. The icon is already on the row, drawn by
   `providers/openedProjects/widgetRegistry/widgetQueryPlan.ts` (Note [When A
   Widget Query Re-Runs]): the first query sends every argument's expression id;
   after an answer, only the named dependencies' ids, and a `revision` stamp of
-  their code and computed value (the payload object; an edit may keep an
-  expression's id). The configuration keeps its identity while that plan is
-  equal (`WidgetFunction/stableConfig.ts`), so an argument nothing depends on
-  changing asks nothing; the subject being recomputed re-runs the visualization
-  in the engine. An answer is taken only when it is new since its query was sent
-  and echoes the query's `revision` (latest wins). **Static answers** (no
+  their code (an edit may keep an expression's id) and the payload object of
+  each node they name. **Never a dependency's own payload object**: the engine
+  sends an argument's unchanged value again after every query, so stamping it
+  re-queried forever (#961; Note [What A Dependency's Revision Reads]). The
+  configuration keeps its identity while that plan is equal
+  (`WidgetFunction/stableConfig.ts`), so an argument nothing depends on changing
+  asks nothing; the subject being recomputed re-runs the visualization in the
+  engine. An answer is taken only when it is new since its query was sent and
+  echoes the query's `revision` (latest wins). **Static answers** (no
   `resolver`, no `columns`) are kept per method and argument names for the
   project's session (`StaticAnswerCache`, an LRU of 256 in `projectStates.ts`),
   and a node they answer detaches its query; entries of a module are dropped
