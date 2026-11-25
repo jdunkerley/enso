@@ -63,12 +63,11 @@ type Choice
        In-lined JSON representation of the Choice. `requires` and `patterns`
        appear only when set, so an option without them serialises as before.
     to_json self -> Text =
-        parameter_json = if self.parameters.length == 0 then '[]' else
-            '[' + ((self.parameters.map p-> '[' + p.first.to_json + ',' + p.second.to_json + ']').join ',') + ']'
+        parameter_json = '[' + (join_json self.parameters p-> '[' + p.first.to_json + ',' + p.second.to_json + ']') + ']'
         requires_json = if self.requires == "" then "" else ',"requires":' + self.requires.to_json
         patterns_json = if self.patterns.is_empty then "" else ',"patterns":' + self.patterns.to_json
         value_json = case self.value of
-            _ : Vector -> '[' + (self.value.map v-> v.to_json).join ',' + ']'
+            nested : Vector -> '[' + (join_json nested .to_json) + ']'
             _ -> self.value.to_json
         '{"label":' + self.label.to_json + ',"value":' + value_json + ',"parameters":' + parameter_json + ',"icon":' + self.icon.to_json + requires_json + patterns_json + '}'
 
@@ -252,8 +251,8 @@ type Widget
         Widget.Folder_Browse -> '{"constructor":"Folder_Browse"}'
         Widget.File_Browse existing_only action file_types ->
             action_json = case action of
+                File_Action.Open -> '"Open"'
                 File_Action.Save -> '"Save"'
-                _ -> '"Open"'
             '{"constructor":"File_Browse","existing_only":' + (if existing_only then "true" else "false") + ',"action":' + action_json + ',"file_types":' + file_types.to_json + '}'
         Widget.Secret_Browse -> '{"constructor":"Secret_Browse"}'
         Widget.Date_Input -> '{"constructor":"Date_Input"}'
@@ -433,6 +432,16 @@ Widget.from (that : Enso_Secret.type) -> Widget =
 Widget.from (that : Regex.type) -> Widget =
     _ = that
     Widget.Regex_Input
+
+## ---
+   private: true
+   ---
+   Joins the JSON of each item with commas, building the text directly rather
+   than mapping to an intermediate Vector of fragments first.
+private join_json items:Vector item_json -> Text =
+    items.fold '' acc-> item->
+        fragment = item_json item
+        if acc.is_empty then fragment else acc + ',' + fragment
 
 ## Appends the sources of the column pickers in the parameters of the choices
    to the builder, looking into nested choices.
