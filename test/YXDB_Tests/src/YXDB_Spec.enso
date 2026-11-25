@@ -1,4 +1,6 @@
 from Standard.Base import all
+import Standard.Base.Metadata.Column_Kind.Column_Kind
+import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 import Standard.Base.Metadata.Widget_Query
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 from Standard.Table import all
@@ -13,11 +15,22 @@ add_specs suite_builder =
             widget = json.get "arguments" . first . second . get "widget"
             widget.get "constructor" . should_equal "Column_Name"
             widget.get "from" . should_equal "table"
+            widget.get "kinds" . should_equal ["Other"]
             # With no table, there are no columns.
             json.get "columns" . should_equal Nothing
             table = Table.new [["RecordID", [1]], ["Spatial", ["x"]]]
             cache name = if name == "table" then table else Nothing
             Widget_Query.columns_json ["table"] Nothing cache . should_contain '"table":{"names":["RecordID","Spatial"]'
+
+        group_builder.specify "spatial_column_to_geojson's column is offered only for the kind a spatial column has" <|
+            table = Data.read (enso_project.data / 'yxdb' / 'line.yxdb') ..YXDB_Format
+            columns = Widget_Columns.from table
+            columns.names . should_equal ["RecordID", "Spatial"]
+            columns.kinds . should_equal [Column_Kind.Numeric, Column_Kind.Other]
+            widget = Widget_Query.resolve_call Nothing "Standard.YXDB.YXDB_Format" "Standard.YXDB.YXDB_Format.YXDB_Format" "spatial_column_to_geojson" ["column"] subject_is_type=True . parse_json . get "arguments" . first . second . get "widget"
+            ## The picker's kinds name the Spatial column's kind and not the RecordID's.
+            widget.get "kinds" . should_contain (columns.kinds.at 1).to_text
+            widget.get "kinds" . should_not_contain (columns.kinds.at 0).to_text
 
         group_builder.specify "Should read a YXDB without error (with explicit format)" <|
             data_file = enso_project.data / 'yxdb' / 'AllNormalFields.yxdb'
