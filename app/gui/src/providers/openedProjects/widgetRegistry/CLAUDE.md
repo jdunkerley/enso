@@ -26,7 +26,8 @@ how they choose and how a widget query runs).
   (`Widget_Query.resolve_type`), asked once per type per session, retried with
   backoff, in a computed frame. `lookup` gives the static default (a union's
   composed from its members'; a `Vector X` member's is a `Vector_Editor` of X's
-  default, built here, memoised per X and marked a type default);
+  default, built here, memoised per X and marked a type default); `prefetch`
+  starts the queries of a method's argument types before they render (spec §6);
   `resolverDefault` the resolver of a type whose default needs the call (group
   C: `Simple_Expression`, `DuckDB_GeoFormat`, …), which the widget query then
   runs per call through `type_defaults`. After `dispose` (the project closing) a

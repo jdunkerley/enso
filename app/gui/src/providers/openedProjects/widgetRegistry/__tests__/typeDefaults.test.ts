@@ -235,6 +235,57 @@ test('only a configuration a lookup returned is a type default', async () => {
   expect(isTypeDefault(undefined)).toBe(false)
 })
 
+test('prefetch asks each union member once, never Nothing, and a later lookup asks nothing', async () => {
+  const query = vi.fn<Query>().mockResolvedValue(WIDGET)
+  const defaults = make((type) => type !== TEXT, query)
+  defaults.prefetch([DATE, `${INTEGER} | ${NOTHING}`, TEXT, undefined, DATE], frameA)
+  // Asked at once, in flight: prefetching again or looking up starts nothing.
+  expect(query.mock.calls.map(([, code]) => code)).toEqual([
+    RESOLVE_TYPE_EXPRESSION(DATE),
+    RESOLVE_TYPE_EXPRESSION(INTEGER),
+  ])
+  defaults.prefetch([DATE, INTEGER], frameA)
+  defaults.lookup(DATE, frameA)
+  await flushPromises()
+  expect(defaults.lookup(DATE, frameB)).toEqual({ kind: 'Date_Input' })
+  defaults.prefetch([DATE], frameB)
+  expect(query).toHaveBeenCalledTimes(2)
+})
+
+test('prefetch without a frame asks in any computed one', async () => {
+  const query = vi.fn<Query>().mockResolvedValue(WIDGET)
+  const pick = vi.fn((preferred: ExternalId | undefined) => preferred ?? frameB)
+  const defaults = make(() => true, query, pick)
+  defaults.prefetch([DATE])
+  expect(pick).toHaveBeenCalledWith(undefined, expect.anything())
+  expect(query).toHaveBeenCalledWith(frameB, RESOLVE_TYPE_EXPRESSION(DATE))
+  await flushPromises()
+  expect(defaults.lookup(DATE, frameA)).toEqual({ kind: 'Date_Input' })
+})
+
+test('prefetch reads nothing reactively', async () => {
+  const query = vi.fn<Query>().mockResolvedValue(WIDGET)
+  const defaults = make(() => true, query)
+  let runs = 0
+  const scope = effectScope()
+  scope.run(() =>
+    watch(
+      computed(() => {
+        runs++
+        defaults.prefetch([DATE], frameA)
+        return runs
+      }),
+      () => {},
+      { immediate: true },
+    ),
+  )
+  await flushPromises()
+  // The answer arrived, and the computed that prefetched did not run again.
+  expect(defaults.lookup(DATE, frameA)).toEqual({ kind: 'Date_Input' })
+  expect(runs).toBe(1)
+  scope.stop()
+})
+
 const frameC = 'cccccccc-cccc-cccc-cccc-cccccccccccc' as ExternalId
 const frameStale = 'dddddddd-dddd-dddd-dddd-dddddddddddd' as ExternalId
 
@@ -599,4 +650,15 @@ test("a list's new item is its item kind's default, a union element's first", as
       },
     ],
   })
+})
+
+test("prefetch asks a `Vector X` member's element types, not the applied type", () => {
+  const query = vi.fn<Query>().mockResolvedValue(WIDGET)
+  const defaults = make((type) => !type.startsWith(VECTOR), query)
+  defaults.prefetch([`${TEXT} | ${VECTOR} (${DATE} | ${INTEGER})`], frameA)
+  expect(query.mock.calls.map(([, code]) => code)).toEqual([
+    RESOLVE_TYPE_EXPRESSION(TEXT),
+    RESOLVE_TYPE_EXPRESSION(DATE),
+    RESOLVE_TYPE_EXPRESSION(INTEGER),
+  ])
 })

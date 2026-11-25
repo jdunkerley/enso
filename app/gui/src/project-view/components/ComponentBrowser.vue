@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import {
+  useCurrentProject,
   useGraphStore,
   useProjectNames,
   useSuggestionDbStore,
 } from '$/components/WithCurrentProject.vue'
 import type { RequiredImport } from '$/providers/openedProjects/module/imports'
-import type { Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
+import { entryIsCallable, type Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { debouncedGetter } from '$/utils/reactivity'
 import { componentBrowserBindings, listBindings } from '@/bindings'
 import ActionButton from '@/components/ActionButton.vue'
@@ -58,6 +59,7 @@ const suggestionDbStore = useSuggestionDbStore()
 const graphStore = useGraphStore()
 const interaction = injectInteractionHandler()
 const projectNames = useProjectNames()
+const { typeDefaults } = useCurrentProject()
 
 const props = defineProps<{
   nodePosition: Vec2
@@ -182,6 +184,25 @@ const selectedSuggestion = computed(() => {
 // === Input and Filtering ===
 
 const input = useComponentBrowserInput()
+
+/**
+ * The default widgets of the argument types of the entry shown (selected, or applied while its
+ * arguments are typed) are asked at once, so that a node placed from it shows its arguments'
+ * widgets as soon as the engine says what the node calls, not one more round trip later.
+ */
+watch(
+  () => [
+    selectedSuggestion.value,
+    input.interpretation.mode === 'codeEditing' ? input.interpretation.appliedSuggestion : null,
+  ],
+  (entries) => {
+    for (const entry of entries) {
+      if (entry && entryIsCallable(entry))
+        typeDefaults.value.prefetch(entry.arguments.map((argument) => argument.reprType))
+    }
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   graphStore.cbEditedEdge = undefined

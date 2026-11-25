@@ -230,7 +230,7 @@ function setUpCallInfo(
   code: string,
   callSuggestion: SuggestionEntry,
   data: Ref<Result<unknown> | null>,
-  typeDefaults?: { lookup: TypeDefaults['lookup'] },
+  typeDefaults?: Pick<TypeDefaults, 'lookup'> & Partial<Pick<TypeDefaults, 'prefetch'>>,
 ) {
   const { ast, id } = parseWithSpans(code, {
     entireFunction: SourceRange.fromStartAndLength(0, code.length),
@@ -310,6 +310,32 @@ test('an argument takes its type default, asked in the frame of the call itself'
   assert(application instanceof ArgumentApplication)
   expect(application.argument.toWidgetInput().dynamicConfig).toEqual({ kind: 'Date_Input' })
   expect(lookup).toHaveBeenCalledWith(DATE, info.callExternalId)
+})
+
+test("once the call is known, every argument's type is prefetched in the call's frame", () => {
+  const DATE = 'Standard.Base.Data.Time.Date.Date'
+  const INTEGER_OR_NOTHING = 'Standard.Base.Data.Numbers.Integer | Standard.Base.Nothing.Nothing'
+  const dated = makeMethod('local.Project.Type.dated', {
+    returnType: 'Standard.Data.Text',
+    args: [
+      makeArgument('self'),
+      makeArgument('when', DATE),
+      // Not applied, and with a default: it is not shown until it is added.
+      { ...makeArgument('count', INTEGER_OR_NOTHING), hasDefault: true },
+    ],
+    annotations: [],
+    projectNames,
+  })
+  const prefetch = vi.fn()
+  const info = setUpCallInfo('local.Project.Type.dated val1', dated, ref(null), {
+    lookup: () => undefined,
+    prefetch,
+  })
+  expect(prefetch).toHaveBeenCalledTimes(1)
+  expect(prefetch).toHaveBeenCalledWith(
+    expect.arrayContaining([DATE, INTEGER_OR_NOTHING]),
+    info.callExternalId,
+  )
 })
 
 test('an answer expands its column pickers from the columns it sends', () => {
