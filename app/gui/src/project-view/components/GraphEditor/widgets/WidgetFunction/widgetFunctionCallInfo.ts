@@ -303,24 +303,31 @@ export function useWidgetFunctionCallInfo(
   const resolvers = computed(() => resolversOf(acceptedAnswer.value?.answer))
   const sentUuids = computed(() => queryUuids(allUuids.value, resolvers.value))
   const revisionIds = new WeakMap<object, number>()
-  /** The code of each subexpression of the call, by external id. */
-  const codeById = computed(() => {
-    const codes = new Map<string, string>()
+  /** Each subexpression of the call, by external id. */
+  const astById = computed(() => {
+    const asts = new Map<string, Ast.Ast>()
     Ast.visitRecursive(toValue(input).value, (ast) => {
-      codes.set(ast.externalId, ast.code())
+      asts.set(ast.externalId, ast)
     })
-    return codes
+    return asts
   })
-  // A dependency is its expression and its value. Its code is not enough: an edit may keep the
-  // expression's id. Its value is the expression's payload: the registry replaces the payload
-  // object on every update of the expression (and keeps the info object).
+  // Note [What A Dependency's Revision Reads] in `widgetQueryPlan.ts`.
   function revisionFor(known: ReadonlyMap<string, ResolverInfo> | undefined) {
     if (!known) return ''
     const db = toValue(graphDb)
     const values = namedDependencies(known).flatMap((name) => {
       const id = allUuids.value[name] as ExternalId | undefined
-      const payload = id && db.getExpressionInfo(id)?.payload
-      return [id && codeById.value.get(id), payload && toRaw(payload)]
+      const ast = id && astById.value.get(id)
+      if (!id || !ast) return [undefined]
+      const nodePayloads: unknown[] = []
+      Ast.visitRecursive(ast, (sub) => {
+        if (!(sub instanceof Ast.Ident)) return true
+        const node = db.getIdentDefiningNode(sub.code())
+        const payload = node && db.getExpressionInfo(node)?.payload
+        nodePayloads.push(payload && toRaw(payload))
+        return false
+      })
+      return [ast.code(), ...nodePayloads]
     })
     return revisionStamp(values, revisionIds)
   }

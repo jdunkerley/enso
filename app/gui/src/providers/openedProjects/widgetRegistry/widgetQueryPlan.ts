@@ -12,6 +12,18 @@
  * does: an edit may keep the expression's id),
  * or the search text. An argument nothing depends on changing leaves the configuration equal, so
  * nothing is asked.
+ *
+ * Note [What A Dependency's Revision Reads]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A dependency's revision is its code and the payload object of each node its code names: its
+ * value changes only with one of them. Not its own payload: after each query the engine sends the
+ * method's uncached subexpressions again (an argument such as `other` or `'c0'`; `fromCache` false,
+ * the value unchanged), and the registry replaces the payload object on every update. Stamping
+ * that object made each query change its own revision and ask again, twice a second for as long as
+ * the project was open (#961). Its payload's content would not do either: a new expression id has
+ * none until the engine computes it, so an edit asked twice. A node's own expression is cached and
+ * sent only when the node is computed again, so its payload object changes exactly when the value
+ * the dependency reads may.
  */
 import type { ResolverInfo, WidgetQueryAnswer, WidgetQueryNote } from './configuration'
 
@@ -53,8 +65,8 @@ export function queryUuids(
 }
 
 /**
- * The revision stamp: changes exactly when one of `dependencyValues` (a dependency's code, or its
- * computed value, by identity) changes. `''` with no named dependency.
+ * The revision stamp: changes exactly when one of `dependencyValues` changes (a primitive by value,
+ * an object by identity). `''` with no named dependency.
  */
 export function revisionStamp(
   dependencyValues: readonly unknown[],
