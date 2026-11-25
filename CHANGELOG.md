@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [The list of kinds a union argument offers shows every kind without scrolling,
+  the kind icons sit on the text's baseline, the whole-number icon is redrawn to
+  read at small sizes, and a `regex '…'` value is outlined as one value
+  again.][950]
 - [Table expressions suggest the values an argument takes: typing
   `cast([Value], ..` lists the value types to cast to.][941]
 - [Widgets that depend on other arguments (join conditions, filter values,
@@ -618,6 +622,7 @@
 
 [940]: https://github.com/jdunkerley/enso/pull/940
 [941]: https://github.com/jdunkerley/enso/pull/941
+[950]: https://github.com/jdunkerley/enso/pull/950
 [933]: https://github.com/jdunkerley/enso/pull/933
 [926]: https://github.com/jdunkerley/enso/pull/926
 [917]: https://github.com/jdunkerley/enso/pull/917
