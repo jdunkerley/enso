@@ -4,6 +4,11 @@
  */
 import { reportWidgetSchemaMismatch } from '$/providers/engineLogAppend'
 import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
+import {
+  defaultItemCode,
+  vectorElementType,
+  vectorItemDefault,
+} from '@/components/GraphEditor/widgets/WidgetVector/elementType'
 import { Ast } from '@/util/ast'
 import { MODULE_CALL } from '@/util/moduleCall'
 import { parseAbsoluteProjectPathRaw } from '@/util/projectPath'
@@ -14,6 +19,7 @@ import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { z } from 'zod'
 import {
   type ResolverInfo,
+  type VectorEditor,
   type WidgetConfiguration,
   resolverInfoSchema,
   widgetConfigurationSchema,
@@ -133,6 +139,11 @@ export class TypeDefaults {
       result: WidgetConfiguration | undefined
     }
   >()
+  /** The list kind of each `Vector X` union member asked for, with the item widget it was built from. */
+  private readonly listKinds = new Map<
+    string,
+    { item: WidgetConfiguration; config: VectorEditor }
+  >()
 
   /** Constructor. */
   constructor(
@@ -166,14 +177,18 @@ export class TypeDefaults {
       const config = this.lookupType(members[0]!, frame)
       return config === 'pending' ? undefined : config
     }
-    const memberWidgets = members.map((typeName) => ({
-      typeName,
-      config: typeName === NOTHING_TYPE ? undefined : this.lookupType(typeName, frame),
-    }))
+    const memberWidgets = members.map((typeName) => {
+      const element = vectorElementType(typeName)
+      if (element != null) return { typeName, config: this.listKind(element, frame), list: true }
+      return {
+        typeName,
+        config: typeName === NOTHING_TYPE ? undefined : this.lookupType(typeName, frame),
+      }
+    })
     const configs = memberWidgets.map((member) => member.config)
     // Asked every time, so the caller keeps depending on the suggestion database's conversions.
     const widgetTypes = memberWidgets
-      .filter((member) => member.config != null && member.config !== 'pending')
+      .filter((member) => !member.list && member.config != null && member.config !== 'pending')
       .map((member) => member.typeName)
     const verdicts = widgetTypes.flatMap((a) =>
       widgetTypes.filter((b) => b !== a).map((b) => this.converts(a, b)),
@@ -193,6 +208,31 @@ export class TypeDefaults {
     if (composed != null) typeDefaultConfigs.add(composed)
     this.composed.set(reprType, { members: configs, verdicts, result: composed })
     return composed
+  }
+
+  /**
+   * The widget of a `Vector X` union member: a list whose items take X's default widget, `undefined`
+   * when X has none (nothing would draw an item), `'pending'` while it is asked. The same object
+   * while X's widget is, so the union's composition stays memoised.
+   */
+  private listKind(element: string, frame: ExternalId): VectorEditor | undefined | 'pending' {
+    const item =
+      unionMembers(element).length > 1 ?
+        this.lookup(element, frame)
+      : this.lookupType(element, frame)
+    if (item == null || item === 'pending') return item
+    const known = this.listKinds.get(element)
+    if (known?.item === item) return known.config
+    /* eslint-disable camelcase */
+    const config: VectorEditor = {
+      kind: 'Vector_Editor',
+      item_editor: item,
+      item_default: vectorItemDefault(item) ?? defaultItemCode(element) ?? '_',
+    }
+    /* eslint-enable camelcase */
+    typeDefaultConfigs.add(config)
+    this.listKinds.set(element, { item, config })
+    return config
   }
 
   /**

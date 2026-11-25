@@ -61,10 +61,15 @@ export function unionMembers(reprType: string): string[] {
   return members.map(stripOuterParentheses)
 }
 
-/** A member and what is known of its widget: `'pending'` while its type default is being asked. */
+/**
+ * A member and what is known of its widget: `'pending'` while its type default is being asked.
+ * `list`: the member is an applied `Vector X` whose widget is a list of X's (built by the GUI, not a
+ * `Widget.from`), which is a kind only beside another kind.
+ */
 export type MemberWidget = {
   typeName: string
   config: WidgetConfiguration | undefined | 'pending'
+  list?: boolean
 }
 
 /** Whether `target.from (that : source)` exists (both fully qualified type names). */
@@ -83,6 +88,9 @@ export function kindLabel(typeName: string): string {
  * - `'pending'` while any member is pending;
  * - `Nothing` is a kind of its own, never absorbed and never absorbing;
  * - members without a widget are dropped (and absorb nothing);
+ * - a `list` member (`Vector X`) neither absorbs nor is absorbed, and is a kind only when a kind that
+ *   is not a list remains besides `Nothing`: `Text | Vector Text` has both kinds, while
+ *   `Vector Text | Nothing` composes as if the list were not there;
  * - a member A is dropped when another member B with a widget has `converts(A, B)`, directly or
  *   through other members, and B does not convert back; of members that all convert to each other
  *   (two, or a cycle of more) the earliest stays; if every member would go, the first stays;
@@ -104,7 +112,7 @@ export function composeUnion(
   )
   // `reach[i][j]`: member i converts to member j, directly or through other members.
   const reach = withWidget.map((a) =>
-    withWidget.map((b) => a !== b && converts(a.typeName, b.typeName)),
+    withWidget.map((b) => a !== b && !a.list && !b.list && converts(a.typeName, b.typeName)),
   )
   for (let k = 0; k < reach.length; k++)
     for (const row of reach) if (row[k]) row.forEach((_, j) => (row[j] ||= reach[k]![j]!))
@@ -115,11 +123,16 @@ export function composeUnion(
   )
   const remaining = survivors.length > 0 ? survivors : withWidget.slice(0, 1)
 
-  const kinds: (UnionKind & { config: WidgetConfiguration })[] = []
-  for (const { typeName, config } of remaining) {
-    if (kinds.some((kind) => equalityDeep(kind.config, config))) continue
-    kinds.push({ label: kindLabel(typeName), config })
+  const listKinds = new Set<UnionKind>()
+  const allKinds: (UnionKind & { config: WidgetConfiguration })[] = []
+  for (const { typeName, config, list } of remaining) {
+    if (allKinds.some((kind) => equalityDeep(kind.config, config))) continue
+    const kind = { label: kindLabel(typeName), config }
+    allKinds.push(kind)
+    if (list) listKinds.add(kind)
   }
+  const onlyLists = allKinds.every((kind) => listKinds.has(kind))
+  const kinds = onlyLists ? [] : allKinds
 
   if (kinds.length === 0) return undefined
   const nothingChoice: Choice = { value: 'Nothing', label: 'Nothing', parameters: [] }

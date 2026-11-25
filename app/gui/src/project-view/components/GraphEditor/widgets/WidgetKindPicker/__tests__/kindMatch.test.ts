@@ -1,7 +1,7 @@
 /* eslint-disable camelcase */
 import { Ast } from '@/util/ast'
 import { expect, test } from 'vitest'
-import { kindDefaultCode, matchKind } from '../kindMatch'
+import { kindDefaultCode, kindSwitchCode, matchKind } from '../kindMatch'
 
 const text = { label: 'Text', config: { kind: 'Text_Input' } } as const
 const integer = { label: 'Integer', config: { kind: 'Numeric_Input' } } as const
@@ -182,4 +182,31 @@ test("every kind's default value reads back as that kind", () => {
     const others = kinds.filter((k) => !shadowed.includes(k as never))
     expect(matchKind(others, parse(code))).toBe(others.indexOf(kind))
   })
+})
+
+test.each([
+  // Text → a list of texts wraps the value.
+  [text.config, vectorText.config, "'x'", "['x']"],
+  [text.config, vectorText.config, "('x')", "['x']"],
+  [text.config, vectorTextOrInteger.config, "'x'", "['x']"],
+  // A list whose items do not take a text starts empty.
+  [text.config, vectorInteger.config, "'x'", '[]'],
+  // A list → Text keeps a single text literal, and is otherwise lossy.
+  [vectorText.config, text.config, "['a']", "'a'"],
+  [vectorText.config, text.config, "[('a')]", "'a'"],
+  [vectorText.config, text.config, "['a', 'b']", "''"],
+  [vectorText.config, text.config, '[]', "''"],
+  [vectorTextOrInteger.config, text.config, '[1]', "''"],
+  // Other switches write the kind's default.
+  [text.config, integer.config, "'x'", '0'],
+  [integer.config, vectorInteger.config, '1', '[]'],
+  [vectorText.config, nothing.config, "['a']", 'Nothing'],
+  [vectorText.config, vectorInteger.config, "['a']", '[]'],
+] as const)('kindSwitchCode(%o → %o, %s) is %s', (from, to, code, expected) => {
+  expect(kindSwitchCode(from as never, to as never, parse(code))).toBe(expected)
+})
+
+test('an unset value switches to the default', () => {
+  expect(kindSwitchCode(text.config, vectorText.config, undefined)).toBe('[]')
+  expect(kindSwitchCode(undefined, vectorText.config, parse("'x'"))).toBe('[]')
 })

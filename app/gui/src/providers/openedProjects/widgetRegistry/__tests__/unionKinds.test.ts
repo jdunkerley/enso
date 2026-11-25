@@ -244,3 +244,77 @@ test('Nothing alone has no widget', () => {
 test('unionMembers splits only at the top level', () => {
   expect(unionMembers('A | (B | C)')).toEqual(['A', 'B | C'])
 })
+
+const VECTOR_TEXT = `Standard.Base.Data.Vector.Vector ${TEXT}`
+const VECTOR_INTEGER = `Standard.Base.Data.Vector.Vector ${INTEGER}`
+const listOf = (item: object) =>
+  // eslint-disable-next-line camelcase
+  ({ kind: 'Vector_Editor', item_editor: item, item_default: "''" }) as const
+const list = (typeName: string, config: MemberWidget['config']): MemberWidget => ({
+  typeName,
+  config,
+  list: true,
+})
+
+test('Text | Vector Text: the list is a kind beside Text', () => {
+  expect(
+    composeUnion([m(TEXT, textInput), list(VECTOR_TEXT, listOf(textInput))], converts),
+  ).toEqual({
+    kind: 'Union',
+    kinds: [
+      { label: 'Text', config: textInput },
+      { label: 'Vector Text', config: listOf(textInput) },
+    ],
+  })
+})
+
+test('a list is a kind only beside another kind: Nothing does not count', () => {
+  expect(composeUnion([list(VECTOR_TEXT, listOf(textInput)), nothing], converts)).toBeUndefined()
+  expect(
+    composeUnion(
+      [list(VECTOR_TEXT, listOf(textInput)), list(VECTOR_INTEGER, listOf(numeric))],
+      converts,
+    ),
+  ).toBeUndefined()
+  expect(composeUnion([list(VECTOR_TEXT, listOf(textInput))], converts)).toBeUndefined()
+})
+
+test('a list whose items have no widget is no kind', () => {
+  expect(composeUnion([m(TEXT, textInput), list(VECTOR_TEXT, undefined)], converts)).toEqual(
+    textInput,
+  )
+})
+
+test('two lists beside another kind are each a kind, Nothing last', () => {
+  const composed = composeUnion(
+    [
+      list(VECTOR_TEXT, listOf(textInput)),
+      m(INTEGER, numeric),
+      list(VECTOR_INTEGER, listOf(numeric)),
+      nothing,
+    ],
+    converts,
+  )
+  expect(composed).toMatchObject({
+    kind: 'Union',
+    kinds: [
+      { label: 'Vector Text' },
+      { label: 'Integer' },
+      { label: 'Vector Integer' },
+      { label: 'Nothing' },
+    ],
+  })
+})
+
+test('a list neither absorbs nor is absorbed', () => {
+  // As if `File.from (that : Vector Text)` existed: the list stays.
+  const all: Converts = () => true
+  expect(composeUnion([m(FILE, file), list(VECTOR_TEXT, listOf(textInput))], all)).toMatchObject({
+    kind: 'Union',
+    kinds: [{ label: 'File' }, { label: 'Vector Text' }],
+  })
+})
+
+test('a list waits for its items', () => {
+  expect(composeUnion([m(TEXT, textInput), list(VECTOR_TEXT, 'pending')], converts)).toBe('pending')
+})

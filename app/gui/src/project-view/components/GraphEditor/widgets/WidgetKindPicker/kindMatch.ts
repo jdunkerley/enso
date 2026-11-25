@@ -71,6 +71,37 @@ export function kindDefaultCode(config: WidgetConfiguration | null): string | un
   }
 }
 
+/**
+ * The code an explicit switch in the kind picker writes, from the kind `value` is (`from`) to `to`.
+ * Two switches carry the value across:
+ * - Text → a list whose items take it wraps it: `'x'` becomes `['x']`;
+ * - a list → Text keeps a list's single text literal (`['a']` becomes `'a'`). Anything else gives
+ *   `''`, losing the list: the owner chose that over refusing the switch.
+ *
+ * Every other switch writes `to`'s default code ({@link kindDefaultCode}), as does an unset value.
+ */
+export function kindSwitchCode(
+  from: WidgetConfiguration | null | undefined,
+  to: WidgetConfiguration | null,
+  value: Ast.Expression | undefined,
+): string | undefined {
+  const ast = value && withoutParentheses(value)
+  if (ast != null && from != null && to != null) {
+    if (
+      from.kind === 'Text_Input' &&
+      to.kind === 'Vector_Editor' &&
+      ast instanceof Ast.TextLiteral &&
+      isItemKind(to.item_editor, ast)
+    )
+      return `[${ast.code()}]`
+    if (from.kind === 'Vector_Editor' && to.kind === 'Text_Input' && ast instanceof Ast.Vector) {
+      const items = [...ast.values()].map(withoutParentheses)
+      if (items.length === 1 && items[0] instanceof Ast.TextLiteral) return items[0].code()
+    }
+  }
+  return kindDefaultCode(to)
+}
+
 function withoutParentheses(ast: Ast.Expression): Ast.Expression {
   while (ast instanceof Ast.Group && ast.expression) ast = ast.expression
   return ast
