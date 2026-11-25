@@ -35,7 +35,9 @@ const choiceSchema: z.ZodType<Choice> = z.object({
  * `requires` is the fully qualified name of a type whose library the choice needs: picking the
  * choice adds that library's import. `patterns` are the file name patterns (`*.db`) of the files
  * the choice reads: with format on `Auto_Detect`, a path that only one type's patterns match adds
- * its import (`WidgetFunction/formatForPath.ts`).
+ * its import (`WidgetFunction/formatForPath.ts`). `detail` is set by the GUI only, never parsed:
+ * a quiet note the dropdown shows beside the label (a column picker's option has the column's
+ * type, `columnPickers.ts`).
  */
 export type Choice = {
   value: ChoiceValue
@@ -44,6 +46,7 @@ export type Choice = {
   icon?: string | null | undefined
   requires?: string | undefined
   patterns?: string[] | undefined
+  detail?: string | undefined
 }
 export type FlattenedChoice = {
   value: string
@@ -208,7 +211,7 @@ export interface FileBrowse {
   kind: 'File_Browse'
   existing_only?: boolean | undefined
   action?: 'Open' | 'Save' | undefined
-  file_types?: FileType[] | undefined
+  file_types: FileType[]
 }
 
 export interface DateInput {
@@ -394,7 +397,7 @@ export const widgetConfigurationSchema: z.ZodType<WidgetConfiguration, z.ZodType
       ]),
     )
     .transform((config): WidgetConfiguration =>
-      config.kind === 'Union' ? toUnionConfig(config as RawUnion) : (config as WidgetConfiguration),
+      config.kind === 'Union' ? toUnionConfig(config) : config,
     )
 
 const argNameSchema = z.string()

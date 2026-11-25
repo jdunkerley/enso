@@ -82,8 +82,11 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
   (`from Standard.Base.Metadata import Widget`). The widget is a _reference_:
   the IDE reads the table's columns once per node and expands the reference, so
   never copy column names into a widget.
-- Add `kinds=[Column_Kind.Numeric]` (and so on) only where the method rejects
-  other kinds with a type error; leave it off where any column is fine.
+- Add `kinds=[Column_Kind.Numeric]` (and so on) only where the method cannot
+  usefully take other kinds: it rejects them with a type error, fails on them
+  later, or answers `Nothing`. Leave it off where any column is fine, and where
+  the method accepts a kind in any path (`Maximum` takes `Mixed`,
+  `expand_to_rows` passes a non-aggregate through, `format` formats anything).
 - **A widget that depends on another argument is a resolver** (Base's
   `CLAUDE.md`, "Resolvers"): write the dependency as a parameter named after the
   argument, defaulted to `Nothing`

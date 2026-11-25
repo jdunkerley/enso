@@ -6,6 +6,7 @@
   the kind icons sit on the text's baseline, the whole-number icon is redrawn to
   read at small sizes, and a `regex '…'` value is outlined as one value
   again.][950]
+- [Column dropdowns show each column's type beside its name.][949]
 - [Table expressions suggest the values an argument takes: typing
   `cast([Value], ..` lists the value types to cast to.][941]
 - [Widgets that depend on other arguments (join conditions, filter values,
@@ -520,6 +521,8 @@
 
 #### Enso Standard Library
 
+- [`YXDB_Format.spatial_column_to_geojson` offers only spatial columns in its
+  column dropdown, not the numbers and text beside them.][951]
 - [Selecting a node shows the arguments you most often change: `format` on
   `Data.read`, `Data.read_many` and `File.read`, `name_filter` on `Data.list`
   and `as` on `Table.set`.][940]
@@ -620,9 +623,11 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[949]: https://github.com/jdunkerley/enso/pull/949
 [940]: https://github.com/jdunkerley/enso/pull/940
 [941]: https://github.com/jdunkerley/enso/pull/941
 [950]: https://github.com/jdunkerley/enso/pull/950
+[951]: https://github.com/jdunkerley/enso/pull/951
 [933]: https://github.com/jdunkerley/enso/pull/933
 [926]: https://github.com/jdunkerley/enso/pull/926
 [917]: https://github.com/jdunkerley/enso/pull/917

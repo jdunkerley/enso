@@ -5,6 +5,7 @@ import project.Data.Vector.Vector
 import project.Errors.Common.Module_Does_Not_Exist
 import project.Errors.Common.No_Such_Conversion
 import project.Errors.Common.No_Such_Method
+import project.Errors.Common.No_Such_Type
 import project.Function.Function
 import project.Meta
 import project.Metadata.Widget
@@ -479,6 +480,7 @@ private _is_missing_default payload typ -> Boolean = case payload of
 private _is_lookup_error payload -> Boolean = case payload of
     _ : No_Such_Method -> True
     _ : Module_Does_Not_Exist -> True
+    _ : No_Such_Type -> True
     _ -> False
 
 private _failure_from_error (method : Widget_Method) (argument : Text) (step : Text) error -> Widget_Failure =

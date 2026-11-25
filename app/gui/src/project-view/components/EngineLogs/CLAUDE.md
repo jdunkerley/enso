@@ -11,15 +11,20 @@ sorting and one-row multi-line entries were dropped on purpose. The design is in
 is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
 
 - `logEntry.ts` — `parseEntry` and `LOG_LEVELS`: the start of an entry,
-  `[LEVEL] [time] [logger] message`.
+  `[LEVEL] [time] [logger] message`. The level is upper case as the IDE's engine
+  writes it or lower case as the `enso` CLI does (`engine/runner`'s
+  `application.conf`, `%level{lowercase=true}`); the engine's format is left
+  alone.
 - The `gui` source: lines the IDE adds (`POST /api/engine-logs/append`,
   `$/providers/engineLogAppend.ts`). They are live only: not in the session's
   file, so not in Download or the session log tab. `enso.gui.Widgets` (the IDE's
   widget problems) is Engine; `enso.gui.performance` (widget timings) is
   Performance.
 - `engineLogModel.ts` — framework-free rows built from the stream's events.
-  - Level rules: stderr is ERROR; a line that starts no entry takes its entry's
-    level.
+  - Level rules: stderr is ERROR; a line that starts no entry takes the level of
+    the last entry **of its own source** (`LineClassifier` keeps one per
+    source), so a `gui` entry arriving between a file entry and its stack trace
+    does not take the trace.
   - Origin (the source tickboxes, #285): `logOrigin` classifies an entry's
     logger name, by whole name segments, as `user` (under `User`: Enso's
     `log_message` logs under `User.<qualified type name>`; the libraries use

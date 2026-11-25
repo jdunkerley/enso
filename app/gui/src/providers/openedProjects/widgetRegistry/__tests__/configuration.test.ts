@@ -210,6 +210,68 @@ test("a Union as a Vector_Editor's item editor", () => {
   expect(parsed.item_editor.kind).toBe('Union')
 })
 
+test('a Union inside a Union parses at both levels, each Nothing last', () => {
+  const parsed = widgetConfigurationSchema.parse({
+    constructor: 'Union',
+    kinds: [
+      [
+        'Inner',
+        {
+          constructor: 'Union',
+          kinds: [
+            ['Text', { constructor: 'Text_Input' }],
+            ['Integer', { constructor: 'Numeric_Input' }],
+          ],
+          include_nothing: true,
+        },
+      ],
+      ['Date', { constructor: 'Date_Input' }],
+    ],
+    include_nothing: true,
+  })
+  expect(parsed).toEqual({
+    kind: 'Union',
+    kinds: [
+      {
+        label: 'Inner',
+        config: {
+          kind: 'Union',
+          kinds: [
+            { label: 'Text', config: { kind: 'Text_Input' } },
+            { label: 'Integer', config: { kind: 'Numeric_Input' } },
+            { label: 'Nothing', config: null },
+          ],
+        },
+      },
+      { label: 'Date', config: { kind: 'Date_Input' } },
+      { label: 'Nothing', config: null },
+    ],
+  })
+})
+
+test('a Union with no kinds and include_nothing is Nothing alone', () => {
+  // `Widget.Union [] include_nothing=True`, as `to_json` writes it.
+  expect(
+    widgetConfigurationSchema.parse({ constructor: 'Union', kinds: [], include_nothing: true }),
+  ).toEqual({ kind: 'Union', kinds: [{ label: 'Nothing', config: null }] })
+  expect(
+    widgetConfigurationSchema.parse({ constructor: 'Union', kinds: [], include_nothing: false }),
+  ).toEqual({ kind: 'Union', kinds: [] })
+})
+
+test.each([
+  ['an action outside Open and Save', { action: 'Append', file_types: [] }],
+  ['a missing file_types', { action: 'Open' }],
+])('File_Browse with %s is rejected', (_, fields) => {
+  expect(
+    widgetConfigurationSchema.safeParse({
+      constructor: 'File_Browse',
+      existing_only: true,
+      ...fields,
+    }).success,
+  ).toBe(false)
+})
+
 test('parses a Regex_Input', () => {
   expect(widgetConfigurationSchema.parse({ constructor: 'Regex_Input' })).toEqual({
     kind: 'Regex_Input',

@@ -6,7 +6,7 @@ import { tryQualifiedName, type Identifier } from '@/util/qualifiedName'
 import { unwrap } from 'enso-common/src/utilities/data/result'
 import { assert, expect, test } from 'vitest'
 import { shallowRef } from 'vue'
-import { ExpressionTag, NestedChoiceTag, useExpressionTags } from '../tags'
+import { ExpressionTag, NestedChoiceTag, useExpressionTags, useTagEntries } from '../tags'
 
 test('Flattening nested choice tags', () => {
   const tag = new NestedChoiceTag('a', [
@@ -62,4 +62,32 @@ test('an option whose type is unknown keeps detecting imports from its code', ()
   const [tag] = formatTags(SuggestionDb.createMock([]))
   assert(tag instanceof ExpressionTag)
   expect(tag.requiredImports).toBeUndefined()
+})
+
+test("a choice's detail reaches its entry, and is kept when a group is flattened", () => {
+  const config: SingleChoice = {
+    kind: 'Single_Choice',
+    label: null,
+    values: [
+      { label: 'Price', value: "'Price'", parameters: [], detail: 'Decimal (38, 10)' },
+      { label: 'Name', value: "'Name'", parameters: [] },
+    ],
+  }
+  const tags = useExpressionTags({
+    dynamicConfig: config,
+    staticTags: null,
+    suggestionDb: SuggestionDb.createMock([]),
+    projectNames: shallowRef(projectNames),
+  }).value
+  const entries = useTagEntries(tags, () => false).value
+  expect(entries.map((e) => [e.value, e.detail])).toEqual([
+    ['Price', 'Decimal (38, 10)'],
+    ['Name', undefined],
+  ])
+  // The code written is the choice's value, not the detail.
+  const [price] = tags
+  assert(price instanceof ExpressionTag)
+  expect(price.expression).toBe("'Price'")
+  const flattened = new NestedChoiceTag('Columns', tags).flatten()
+  expect(flattened.map((t) => t.detail)).toEqual(['Decimal (38, 10)', undefined])
 })

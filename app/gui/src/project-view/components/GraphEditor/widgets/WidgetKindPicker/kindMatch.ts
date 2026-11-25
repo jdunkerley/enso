@@ -6,6 +6,7 @@ import {
   type UnionKind,
   type WidgetConfiguration,
 } from '$/providers/openedProjects/widgetRegistry/configuration'
+import { stripOuterParentheses } from '$/providers/openedProjects/widgetRegistry/unionKinds'
 import { DATE_CALLS } from '@/components/GraphEditor/widgets/WidgetDate/dateExpression'
 import { DATE_TIME_CALLS } from '@/components/GraphEditor/widgets/WidgetDateTime/dateTimeExpression'
 import { isCallOfShape } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
@@ -13,15 +14,29 @@ import { regexPattern } from '@/components/GraphEditor/widgets/WidgetRegex/regex
 import { TIME_CALLS } from '@/components/GraphEditor/widgets/WidgetTimeOfDay/timeExpression'
 import { Ast } from '@/util/ast'
 
-/** The index in `kinds` of the kind `value` is, or `undefined` if it is none of them. An unset argument is kind 0. */
+/**
+ * The index in `kinds` of the kind `value` is, or `undefined` if it is none of them. An unset
+ * argument is kind 0. A vector is the first `Vector_Editor` kind whose item widget every item
+ * matches (so `[]` is the first of them, and `[1]` is `Vector Integer` in
+ * `Vector Text | Vector Integer`), else the first kind that takes any vector.
+ */
 export function matchKind(
   kinds: readonly UnionKind[],
   value: Ast.Expression | undefined,
 ): number | undefined {
   if (value === undefined) return 0
   const ast = withoutParentheses(value)
-  const index = kinds.findIndex((kind) => isKind(kind.config, ast))
+  const byItems = kinds.findIndex((kind) => isKind(kind.config, ast, true))
+  if (byItems >= 0) return byItems
+  const index = kinds.findIndex((kind) => isKind(kind.config, ast, false))
   return index < 0 ? undefined : index
+}
+
+/** Whether `ast` is a value of the item widget `config` (any kind of it, for a union). */
+function isItemKind(config: WidgetConfiguration, ast: Ast.Expression): boolean {
+  return config.kind === 'Union' ?
+      config.kinds.some((kind) => isKind(kind.config, ast, true))
+    : isKind(config, ast, true)
 }
 
 /** The code switching to a kind writes, or `undefined` if the kind cannot be offered. */
@@ -61,10 +76,6 @@ function withoutParentheses(ast: Ast.Expression): Ast.Expression {
   return ast
 }
 
-function unwrapParentheses(code: string): string {
-  return code.startsWith('(') && code.endsWith(')') ? code.slice(1, -1).trim() : code
-}
-
 function applicationHead(ast: Ast.Expression): Ast.Expression {
   while (ast instanceof Ast.App) ast = ast.function
   return ast
@@ -76,7 +87,12 @@ function isApplicationOf(ast: Ast.Expression, heads: readonly string[]): boolean
   return heads.some((h) => head === h || head.endsWith(`.${h}`))
 }
 
-function isKind(config: WidgetConfiguration | null, ast: Ast.Expression): boolean {
+/** `itemsMatch`: a `Vector_Editor` takes a vector only if its item widget takes every item. */
+function isKind(
+  config: WidgetConfiguration | null,
+  ast: Ast.Expression,
+  itemsMatch: boolean,
+): boolean {
   if (config === null) {
     const code = ast.code()
     return code === 'Nothing' || code === 'Standard.Base.Nothing.Nothing'
@@ -102,7 +118,7 @@ function isKind(config: WidgetConfiguration | null, ast: Ast.Expression): boolea
     case 'Single_Choice': {
       const code = ast.code()
       return config.values.flatMap(flattenChoice).some(({ value }) => {
-        const option = unwrapParentheses(value.trim())
+        const option = stripOuterParentheses(value)
         if (code === option) return true
         // An option with arguments (`..Equals that=1`) matches any application of its head.
         const [head, ...rest] = option.split(/\s+/)
@@ -110,8 +126,15 @@ function isKind(config: WidgetConfiguration | null, ast: Ast.Expression): boolea
       })
     }
     case 'Multiple_Choice':
-    case 'Vector_Editor':
       return ast instanceof Ast.Vector
+    case 'Vector_Editor':
+      return (
+        ast instanceof Ast.Vector &&
+        (!itemsMatch ||
+          [...ast.values()].every((item) =>
+            isItemKind(config.item_editor, withoutParentheses(item)),
+          ))
+      )
     case 'File_Browse':
     case 'Folder_Browse':
       return ast instanceof Ast.TextLiteral || isApplicationOf(ast, ['File.new'])
