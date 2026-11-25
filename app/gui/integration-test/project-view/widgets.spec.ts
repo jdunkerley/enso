@@ -2392,6 +2392,8 @@ test.describe('Kind picker', () => {
             '    annot = Data.annotated',
             "    vec = Data.vec_items ['a', 1]",
             '    dates = Data.vec_dates []',
+            "    fsec = Data.file_secret (Enso_Secret.get 'pw')",
+            "    fpath = Data.file_secret 'data.csv'",
             '',
           ].join('\n'),
         ),
@@ -2812,6 +2814,27 @@ test.describe('Kind picker', () => {
     await locate.addItemButton(node).click()
     await expect(vector.locator('.item')).toHaveCount(3)
     expect(await moduleCode(page)).toContain("vec = Data.vec_items ['a', 1, '']\n")
+  })
+
+  test('File | Enso_Secret: each kind browses only its own items', async ({ editorPage, page }) => {
+    const method = unionMethod('file_secret', `${FILE} | ${SECRET}`)
+    const secretNode = await kindNode(editorPage, page, 'fsec', method, true)
+    await expect(secretNode.locator('.kindIcon')).toHaveAttribute('title', 'Enso_Secret')
+    await select(page, secretNode)
+    const secrets = new DropDownLocator(secretNode)
+    await secrets.clickWidget()
+    await secrets.expectVisible()
+    await expect(secrets.item(CHOOSE_LOCAL_FILE)).toHaveCount(0)
+    await expect(secrets.item('New secret…')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await secrets.expectNotVisible()
+
+    const fileNode = await kindNode(editorPage, page, 'fpath', method, true)
+    await expect(fileNode.locator('.kindIcon')).toHaveAttribute('title', 'File')
+    await select(page, fileNode)
+    const files = new DropDownLocator(fileNode)
+    await files.clickWidget()
+    await files.expectVisibleWithOptions(CHOOSE_FILE_OPTIONS)
   })
 
   test("Vector (Date | Text): + adds the first kind's default with its import, in one undo step", async ({
