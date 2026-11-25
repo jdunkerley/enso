@@ -6,9 +6,12 @@ import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget_Query
 import Standard.Base.Metadata.Column_Kind.Column_Kind
 import Standard.Base.Metadata.Widget_Columns.Widget_Columns
+from Standard.Base.Widget_Helpers import make_separator_selector
 from Standard.Base.Metadata.Widget_Query import Widget_Method
 
 from Standard.Table import Table, Value_Type
+import Standard.Table.Spatial_Table.Spatial_Table
+import Standard.Table.Internal.Column_Kinds
 import Standard.Table.Internal.Widget_Helpers
 from Standard.Table.Columns_To_Add import Columns_To_Add
 from Standard.Table.Columns_To_Keep import Columns_To_Keep
@@ -53,12 +56,37 @@ widget_of table method argument =
     json = Widget_Query.resolve_call table table_module table_type method [argument] . parse_json
     json.get "arguments" . first . second . get "widget"
 
+## Whether the answer holds `option` serialised as a whole: its label, value and
+   every nested picker together.
+answer_contains_option table method argument option =
+    Widget_Query.resolve_call table table_module table_type method [argument] . contains option.to_json
+
 ## The nested `parameter` widget of the option labelled `option`, found by
    looking for the option's own JSON in the answer.
 answer_contains table method argument option_label parameter_widget =
     json = Widget_Query.resolve_call table table_module table_type method [argument]
     option = Option option_label option_label [[ "column", parameter_widget ]]
     json.contains option.to_json
+
+## The options of a `Single_Choice`, or of the `item_editor` of a
+   `Vector_Editor`, as parsed JSON.
+choice_values widget = case widget.get "constructor" of
+    "Vector_Editor" -> widget.get "item_editor" . get "values"
+    _ -> widget.get "values"
+
+## The option labelled `label` in the choice (or the choice inside the vector
+   editor) `widget`.
+option_labelled widget label =
+    choice_values widget . find o-> o.get "label" == label
+
+## The nested pickers of a parsed option as `[name, picker JSON]` pairs.
+parameters_of option = option.get "parameters" . map p-> [p.first, p.second.to_json]
+
+## The same pairs for pickers written as `Widget` values.
+pickers pairs = pairs.map p-> [p.first, p.second.to_json]
+
+## The nested pickers of the option labelled `label`.
+parameters_labelled widget label = parameters_of (option_labelled widget label)
 
 add_specs suite_builder =
     suite_builder.group "Widgets for In-Memory with column name sets" group_builder->
@@ -118,10 +146,10 @@ add_specs suite_builder =
             ["..Count_Not_Nothing", "..Count_Nothing", "..Mode", "..Maximum", "..Minimum"].each label->
                 answer_contains mock_table "aggregate" "columns" label (Widget.Column_Name expression=True) . should_be_true
 
-        group_builder.specify "aggregate's Concatenate offers text columns" <|
-            json = Widget_Query.resolve_call mock_table table_module table_type "aggregate" ["columns"]
-            json.contains (Widget.Column_Name kinds=textual expression=True).to_json . should_be_true
-            json.contains '"..Concatenate"' . should_be_true
+        group_builder.specify "aggregate's Concatenate offers text columns, with its separator" <|
+            concatenate = Option "..Concatenate" "..Concatenate" [["column", Widget.Column_Name kinds=textual expression=True], ["separator", make_separator_selector]]
+            answer_contains_option mock_table "aggregate" "columns" concatenate . should_be_true
+            parameters_labelled (widget_of mock_table "aggregate" "columns") "..Concatenate" . should_equal (pickers [["column", Widget.Column_Name kinds=textual expression=True], ["separator", make_separator_selector]])
 
         group_builder.specify "cross_tab's values shares the aggregate pickers" <|
             answer_contains mock_table "cross_tab" "values" "..Sum" (Widget.Column_Name kinds=numeric expression=True) . should_be_true
@@ -179,6 +207,96 @@ add_specs suite_builder =
             json = Widget_Query.resolve_call mock_table table_module table_type "generate_rows" ["over"] "{}" False "" '{"over":"Standard.Table.Generate_Rows_Range.Generate_Rows_Range"}'
             json.contains '"kinds":["Numeric"]' . should_be_true
             json.contains '"kinds":["Date_Only"]' . should_be_true
+
+    suite_builder.group "Composite builders resolve their nested pickers" group_builder->
+        mock_table = Table.from_rows ["A", "B"] []
+        any = Widget.Column_Name expression=True
+        textual = Widget.Column_Name kinds=[Column_Kind.Textual] expression=True
+        numeric = Widget.Column_Name kinds=[Column_Kind.Numeric] expression=True
+        order_by = Widget.Order_By name_only=True
+
+        group_builder.specify "aggregate offers every aggregation, each with the pickers of its arguments" <|
+            widget = widget_of mock_table "aggregate" "columns"
+            widget.get "constructor" . should_equal "Vector_Editor"
+            widget.get "item_default" . should_equal "..Count"
+            expected = [["..Count", []], ["..Sum", [["column", numeric]]], ["..Average", [["column", numeric]]], ["..Maximum", [["column", any]]], ["..Minimum", [["column", any]]], ["..Count_Distinct", [["columns", Widget.Column_Names]]], ["..First", [["column", any], ["order_by", order_by]]], ["..Last", [["column", any], ["order_by", order_by]]], ["..Count_Not_Nothing", [["column", any]]], ["..Count_Nothing", [["column", any]]], ["..Count_Not_Empty", [["column", textual]]], ["..Count_Empty", [["column", textual]]], ["..Concatenate", [["column", textual], ["separator", make_separator_selector]]], ["..Shortest", [["column", textual]]], ["..Longest", [["column", textual]]], ["..Median", [["column", numeric]]], ["..Percentile", [["column", numeric]]], ["..Mode", [["column", any]]], ["..Standard_Deviation", [["column", numeric]]]]
+            (choice_values widget . map (o-> o.get "label")) . should_equal (expected.map .first)
+            expected.each entry->
+                Test.with_clue entry.first+": " <|
+                    parameters_labelled widget entry.first . should_equal (pickers entry.second)
+
+        group_builder.specify "an in-memory table offers neither spatial nor SQL aggregations" <|
+            labels = choice_values (widget_of mock_table "aggregate" "columns") . map (o-> o.get "label")
+            labels.should_not_contain "..ST_Union"
+            labels.should_not_contain "<SQL Function>"
+
+        group_builder.specify "add_group_number's grouping methods offer the pickers of their arguments" <|
+            json = Widget_Query.resolve_call mock_table table_module table_type "add_group_number" ["grouping_method"] . parse_json
+            result = json.get "arguments" . first . second
+            result.get "resolver" . get "dependencies" . should_equal ["self"]
+            widget = result.get "widget"
+            widget.get "constructor" . should_equal "Single_Choice"
+            columns = Widget.Column_Names
+            column = Widget.Column_Name
+            expected = [["..Unique", [["on", columns]]], ["..Equal_Count", [["order_by", columns]]], ["..Equal_Sum", [["on", column], ["order_by", columns]]], ["..Standard_Deviation", [["on", column]]]]
+            (choice_values widget . map (o-> o.get "label")) . should_equal (expected.map .first)
+            expected.each entry->
+                parameters_labelled widget entry.first . should_equal (pickers entry.second)
+
+        group_builder.specify "rename_columns' items pick a column, or a regular expression" <|
+            widget = widget_of mock_table "rename_columns" "column_map"
+            widget.get "constructor" . should_equal "Vector_Editor"
+            widget.get "item_default" . should_equal "(Pair.Value 'A' 'New Name')"
+            (choice_values widget . map (o-> o.get "label")) . should_equal ["Name"]
+            (option_labelled widget "Name" . get "value") . should_equal "Standard.Base.Data.Pair.Pair.Value"
+            parameters_labelled widget "Name" . should_equal (pickers [["first", Widget.Column_Name extra=[Option "<Regular Expression>" "(regex '^.*$')"]]])
+
+        group_builder.specify "filter offers its conditions in groups, each comparing with the same picker" <|
+            widget = widget_of mock_table "filter" "filter"
+            chooser = Widget_Helpers.make_column_ref_by_name_selector_for_type mock_table value_type=Value_Type.Mixed if_value_type_numeric_include_all_numeric=True
+            regex = Widget.Column_Name kinds=[Column_Kind.Textual] reference=True expression=True extra=(Widget_Helpers.make_column_ref_by_name_selector Nothing add_regex=True).values
+            (choice_values widget . map (o-> o.get "label")) . should_equal ["..Equal", "..Not_Equal", "..Is_Nothing", "..Not_Nothing", "..Is_In", "Comparisons", "Text", "Boolean", "Numeric"]
+            parameters_labelled widget "..Equal" . should_equal (pickers [["to", chooser]])
+            parameters_labelled widget "..Not_Equal" . should_equal (pickers [["to", chooser]])
+            parameters_labelled widget "..Is_Nothing" . should_equal []
+            parameters_labelled widget "..Is_In" . should_equal (pickers [["values", Widget.Vector_Editor item_editor=chooser item_default='""']])
+            group_labels label = option_labelled widget label . get "value" . map (o-> o.get "label")
+            group_labels "Comparisons" . should_equal ["..Less", "..Equal_Or_Less", "..Greater", "..Equal_Or_Greater", "..Between"]
+            group_labels "Text" . should_equal ["..Is_Empty", "..Not_Empty", "..Equal_Ignore_Case", "..Starts_With", "..Ends_With", "..Contains", "..Like", "..Regex_Match"]
+            group_labels "Boolean" . should_equal ["..Is_True", "..Is_False"]
+            group_labels "Numeric" . should_equal ["..Is_Finite", "..Is_Infinite", "..Is_Nan", "..Not_Nan"]
+            nested group label = (option_labelled widget group . get "value") . find o-> o.get "label" == label
+            (parameters_of (nested "Comparisons" "..Between")) . should_equal (pickers [["lower", chooser], ["upper", chooser]])
+            (parameters_of (nested "Text" "..Starts_With")) . should_equal (pickers [["prefix", chooser]])
+            (parameters_of (nested "Text" "..Regex_Match")) . should_equal (pickers [["pattern", regex]])
+
+        group_builder.specify "filter's answer is exactly the builder's widget" <|
+            expect = answer "filter" (Widget_Helpers.make_filter_condition_selector mock_table) (subject_columns mock_table) (resolver_of ["self", "column"])
+            Widget_Query.resolve_call mock_table table_module table_type "filter" ["filter"] . should_equal expect
+
+        group_builder.specify "join offers a spatial group when the table is a Spatial_Table" pending="The builder asks `table.is_a Spatial_Table`, but its `table:Table` argument has already unwrapped a Spatial_Table, and a Table is never one: the group is never offered." <|
+            widget = Widget_Helpers.make_join_condition_selector (Spatial_Table.from mock_table) right=mock_table
+            (widget.item_editor.values.map .label) . should_contain "Spatial"
+
+    suite_builder.group "Widget_Columns.from caches per type, not per name" group_builder->
+        group_builder.specify "a table of many types answers each column's own kind and type name" <|
+            raw = Table.new [["char3", ["abc", "def"]], ["char5", ["abcde", "fghij"]], ["text", ["a", "b"]], ["big", [2^70, 1]], ["small", [1, 2]], ["decimal", [Decimal.new "1.5", Decimal.new "2.5"]], ["nothing", [Nothing, Nothing]], ["mixed", [1, "a"]], ["float", [1.5, 2.5]], ["char3_again", ["xyz", "uvw"]]]
+            t = raw.cast ["char3", "char3_again"] (Value_Type.Char 3 False) . cast ["char5"] (Value_Type.Char 5 False)
+            columns = Widget_Columns.from t
+            columns.names . should_equal ["char3", "char5", "text", "big", "small", "decimal", "nothing", "mixed", "float", "char3_again"]
+            columns.kinds . should_equal [Column_Kind.Textual, Column_Kind.Textual, Column_Kind.Textual, Column_Kind.Numeric, Column_Kind.Numeric, Column_Kind.Numeric, Column_Kind.Other, Column_Kind.Other, Column_Kind.Numeric, Column_Kind.Textual]
+            columns.type_names . should_equal ["Char", "Char", "Char", "Decimal", "Integer", "Decimal", "Null", "Mixed", "Float", "Char"]
+            ## Whatever the cache keyed on, it answers what each column's own type gives.
+            columns.kinds . should_equal (t.columns.map c-> Column_Kinds.of_value_type c.value_type)
+            columns.type_names . should_equal (t.columns.map c-> c.value_type.to_name)
+
+        group_builder.specify "the types differ although the names match: two Char sizes, and Decimals of different precision" <|
+            t = (Table.new [["a", ["abc"]], ["b", ["abcde"]], ["big", [2^70]], ["dec", [Decimal.new "1.5"]]]).cast ["a"] (Value_Type.Char 3 False) . cast ["b"] (Value_Type.Char 5 False)
+            (t.at "a").value_type . should_not_equal (t.at "b").value_type
+            (t.at "big").value_type . should_not_equal (t.at "dec").value_type
+            columns = Widget_Columns.from t
+            columns.type_names . should_equal ["Char", "Char", "Decimal", "Decimal"]
+            columns.kinds . should_equal [Column_Kind.Textual, Column_Kind.Textual, Column_Kind.Numeric, Column_Kind.Numeric]
 
     suite_builder.group "Table's resolvers read their dependencies by name" group_builder->
         t = Table.new [["A", [1, 2]], ["B", ["x", "y"]], ["D", [Date.new 2020, Date.new 2021]]]

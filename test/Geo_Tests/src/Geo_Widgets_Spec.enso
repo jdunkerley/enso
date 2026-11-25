@@ -1,5 +1,9 @@
 from Standard.Base import all
+import Standard.Base.Metadata.Column_Kind.Column_Kind
+import Standard.Base.Metadata.Widget
+import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 import Standard.Base.Metadata.Widget_Query
+from Standard.Base.Widget_Helpers import make_any_selector
 
 from Standard.Table import Table
 from Standard.Geo import all
@@ -8,16 +12,14 @@ from Standard.Test import all
 
 add_specs suite_builder =
     suite_builder.group "Geo widgets" group_builder->
-        group_builder.specify "geo_distance's latitude offers numeric columns by reference" <|
+        group_builder.specify "geo_distance's coordinates offer numeric columns by reference" <|
             t = Table.new [["lat", [1.5]], ["name", ["a"]], ["n", [1]]]
-            json = Widget_Query.resolve_call t "Standard.Geo.Table_Extensions" "Standard.Table.Table.Table" "geo_distance" ["lat1"] . parse_json
-            widget = json.get "arguments" . first . second . get "widget"
-            widget.get "constructor" . should_equal "Column_Name"
-            widget.get "kinds" . should_equal ["Numeric"]
-            widget.get "reference" . should_be_true
-            widget.get "expression" . should_be_true
-            widget.get "extra" . map (o-> o.get "label") . should_equal ["<Number Value>"]
-            json.get "columns" . get "" . get "names" . should_equal ["lat", "name", "n"]
+            picker = Widget.Column_Name kinds=[Column_Kind.Numeric] reference=True expression=True extra=(make_any_selector add_number=True).values
+            columns_json = ',"columns":{"":' + (Widget_Columns.from t . to_json) + '}'
+            resolver_json = ',"resolver":{"dependencies":["self"],"searchable":false}'
+            ["lat1", "long1", "lat2", "long2"].each argument->
+                expect = '{"arguments":[[' + argument.to_json + ',{"widget":' + picker.to_json + resolver_json + '}]]' + columns_json + '}'
+                Widget_Query.resolve_call t "Standard.Geo.Table_Extensions" "Standard.Table.Table.Table" "geo_distance" [argument] . should_equal expect
 
 main filter=Nothing =
     suite = Test.build suite_builder->

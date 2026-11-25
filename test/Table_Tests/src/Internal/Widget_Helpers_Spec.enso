@@ -16,9 +16,9 @@ main filter=Nothing =
     suite.run_with_filter filter
 
 ## The labels of the extra entries of a `Widget.Column_Name`.
-extra_labels widget = case widget of
-    Widget.Column_Name _ _ _ _ extra _ -> extra.map .label
-    _ -> Test.fail "Expecting a Column_Name, got "+widget.to_text
+extra_labels widget =
+    (Meta.meta widget . constructor . name) . should_equal "Column_Name"
+    widget.extra.map .label
 
 add_specs suite_builder =
     table = Table.new [["X", [1, 2, 3, 4]], ["Y", ["a", "b", "c", "d"]]]
@@ -46,19 +46,22 @@ add_specs suite_builder =
             w . should_equal (Widget.Column_Name expression=True reference=True extra=(make_any_selector_values))
         group_builder.specify "make_column_ref_by_name_selector columns_first" <|
             w = make_column_ref_by_name_selector table columns_first=True
-            case w of
-                Widget.Column_Name _ _ expression reference _ columns_first ->
-                    [expression, reference, columns_first] . should_equal [True, True, True]
-                _ -> Test.fail "Expecting a Column_Name"
+            (Meta.meta w . constructor . name) . should_equal "Column_Name"
+            [w.expression, w.reference, w.columns_first] . should_equal [True, True, True]
         group_builder.specify "make_column_ref_by_name_selector without a table keeps the constants" <|
             w = make_column_ref_by_name_selector Nothing add_number=True
             w.should_be_a Widget.Single_Choice
             w.values.map .label . should_equal ["<Number Value>"]
         group_builder.specify "make_filter_condition_selector" <|
             w = make_filter_condition_selector table
-            j = w.to_text
-            ## Just testing the start as this is very long...
-            j.should_contain "(Single_Choice [(Option '..Equal' '..Equal' [['to', (Column_Name "
+            w.should_be_a Widget.Single_Choice
+            w.values.map .label . should_equal ["..Equal", "..Not_Equal", "..Is_Nothing", "..Not_Nothing", "..Is_In", "Comparisons", "Text", "Boolean", "Numeric"]
+            chooser = make_column_ref_by_name_selector_for_type table value_type=Value_Type.Mixed
+            equal = w.values.first
+            equal.value . should_equal "..Equal"
+            equal.parameters . should_equal [["to", chooser]]
+            between = (w.values.find o-> o.label == "Comparisons") . value . find o-> o.label == "..Between"
+            between.parameters . should_equal [["lower", chooser], ["upper", chooser]]
     suite_builder.group "Can run make_column_ref_by_name_selector_for_type" group_builder->
         table2 = Table.new [["Ints1", [1, 2, 3, 4]], ["Ints2", [1, 2, 3, 4]], ["Floats", [1.0, 2.0, 3.0, 4.0]], ["Texts", ["a", "b", "c", "d"]], ["Texts2", ["a", "b", "c", "d"]]]
         group_builder.specify "an integer type offers the Numeric kind and the number constant" <|
