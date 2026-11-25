@@ -516,6 +516,8 @@
 
 #### Enso Standard Library
 
+- [`YXDB_Format.spatial_column_to_geojson` offers only spatial columns in its
+  column dropdown, not the numbers and text beside them.][951]
 - [Selecting a node shows the arguments you most often change: `format` on
   `Data.read`, `Data.read_many` and `File.read`, `name_filter` on `Data.list`
   and `as` on `Table.set`.][940]
@@ -618,6 +620,7 @@
 
 [940]: https://github.com/jdunkerley/enso/pull/940
 [941]: https://github.com/jdunkerley/enso/pull/941
+[951]: https://github.com/jdunkerley/enso/pull/951
 [933]: https://github.com/jdunkerley/enso/pull/933
 [926]: https://github.com/jdunkerley/enso/pull/926
 [917]: https://github.com/jdunkerley/enso/pull/917
