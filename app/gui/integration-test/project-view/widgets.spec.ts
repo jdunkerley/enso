@@ -2391,6 +2391,7 @@ test.describe('Kind picker', () => {
             '    tfn = Data.text_file_nothing',
             '    annot = Data.annotated',
             "    vec = Data.vec_items ['a', 1]",
+            '    dates = Data.vec_dates []',
             '',
           ].join('\n'),
         ),
@@ -2532,6 +2533,8 @@ test.describe('Kind picker', () => {
     await page.keyboard.press('Escape')
     await dropdown.expectNotVisible()
     await expect(changeKind(node, 'Nothing')).toBeFocused()
+    // No Enter reached the graph, which would have opened the component browser.
+    await expect(locate.componentBrowser(page)).toBeHidden()
   })
 
   test('Text | Nothing with a default of Nothing: the added argument is an explicit Nothing, and Text and back write code', async ({
@@ -2618,9 +2621,11 @@ test.describe('Kind picker', () => {
     await changeKind(node, 'Text').click()
     await list(page).clickOption('Integer')
     await expect(changeKind(node, 'Integer')).toBeVisible()
+    await expect(node.locator('.WidgetNumber')).toHaveValue('0')
     expect(await moduleCode(page)).toContain('textint = Data.text_int 0\n')
     await page.keyboard.press('ControlOrMeta+Z')
     await expect(changeKind(node, 'Text')).toBeVisible()
+    await expect(node.getByTestId('widget-text-content')).toHaveText('a')
     expect(await moduleCode(page)).toContain("textint = Data.text_int 'a'\n")
   })
 
@@ -2652,6 +2657,7 @@ test.describe('Kind picker', () => {
     await page.keyboard.insertText('a+')
     await page.keyboard.press('Enter')
     await expect(node).toContainText(/regex\W*a\+/)
+    await expect(locate.componentBrowser(page)).toBeHidden()
     expect(await moduleCode(page)).toContain("textre = Data.text_regex (regex 'a+')\n")
   })
 
@@ -2673,7 +2679,6 @@ test.describe('Kind picker', () => {
     await expect(changeKind(node, 'Enso_Secret')).toBeVisible()
     const code = await moduleCode(page)
     expect(code).toContain("textsec = Data.text_secret (Enso_Secret.get '')\n")
-    expect(code).toContain('Enso_Secret')
     await expect(node).toContainText(/Enso_Secret\W*get/)
     await expect(node.locator('.WidgetKindPicker .WidgetSelection')).toHaveCount(1)
   })
@@ -2807,6 +2812,41 @@ test.describe('Kind picker', () => {
     await locate.addItemButton(node).click()
     await expect(vector.locator('.item')).toHaveCount(3)
     expect(await moduleCode(page)).toContain("vec = Data.vec_items ['a', 1, '']\n")
+  })
+
+  test("Vector (Date | Text): + adds the first kind's default with its import, in one undo step", async ({
+    editorPage,
+    page,
+  }) => {
+    // An empty vector has no item, so no kind picker to wait for (`kindNode`). The Date type's
+    // entry is what its import is found from.
+    await editorPage
+      .mockSuggestion({
+        type: 'type',
+        module: `${T}.Time.Date`,
+        name: 'Date',
+        params: [],
+        reexport: 'Standard.Base.Main',
+      })
+      .mockSuggestion(
+        unionMethod('vec_dates', `${T}.Vector.Vector (${T}.Time.Date.Date | ${TEXT})`),
+      )
+    await mockMethodCallInfo(page, 'dates', {
+      methodPointer: { module: T, definedOnType: T, name: 'vec_dates' },
+      notAppliedArguments: [],
+    })
+    const node = locate.graphNodeByBinding(page, 'dates')
+    await expect(node.locator('.WidgetVector')).toBeVisible()
+    expect(await moduleCode(page)).not.toContain('import Date')
+    await node.click()
+    await locate.addItemButton(node).click()
+    await expect(node.locator('.WidgetVector .item')).toHaveCount(1)
+    const code = await moduleCode(page)
+    expect(code).toContain('dates = Data.vec_dates [Date.today]\n')
+    expect(code).toContain('from Standard.Base import Date')
+    await page.keyboard.press('ControlOrMeta+Z')
+    await expect(node.locator('.WidgetVector .item')).toHaveCount(0)
+    expect(await moduleCode(page)).not.toContain('import Date')
   })
 })
 

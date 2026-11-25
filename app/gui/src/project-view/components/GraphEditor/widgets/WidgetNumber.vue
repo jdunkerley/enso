@@ -67,7 +67,10 @@ const editHandler = WidgetEditHandler.New(props, {
 export const widgetDefinition = defineWidget(
   WidgetInput.isAstOrPlaceholder,
   {
-    priority: 1001,
+    // After `WidgetText` (1001): a text literal under an annotation's `Numeric_Input` scores
+    // Perfect for both, and keeps the text input, which can edit it. The literal decides between
+    // the two either way, since `WidgetText` takes no number literal.
+    priority: 1002,
     score: (props) => {
       // A type default claims only an unset argument (the number literals are caught below): a
       // reference, `_`, `Nothing`, a vector or a text literal keeps the widget that draws it.

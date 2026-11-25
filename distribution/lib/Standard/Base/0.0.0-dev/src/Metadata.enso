@@ -156,6 +156,13 @@ type Widget
     ## Describes an argument that takes one of several kinds of value: the IDE
        shows a picker of the kinds in front of the chosen kind's widget.
 
+       Its JSON is
+       `{"constructor":"Union","kinds":[["<label>",<widget>],…],"include_nothing":<Boolean>}`:
+       each kind a pair of its label and its widget's JSON, in picker order.
+       With no kinds and `include_nothing=True`
+       (`{"constructor":"Union","kinds":[],"include_nothing":true}`), `Nothing`
+       is the only kind, and an unset argument shows `Nothing`.
+
        ## Arguments
         - `kinds`: The kinds, in the order the picker lists them: a label and
           the widget for a value of that kind.

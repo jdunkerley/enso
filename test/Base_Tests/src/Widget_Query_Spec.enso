@@ -172,6 +172,9 @@ private _panics subject = Panic.throw (Illegal_State.Error "boom for "+subject.l
 ## The answer for one argument whose widget is `widget`.
 answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
 
+## A dataflow error standing for the user's own error as a query's subject.
+the_user_error = Error.throw (Illegal_State.Error "the user's own error")
+
 ## The error part of the answer for the one argument asked for.
 error_of answer_json = answer_json.parse_json . get "arguments" . first . second . get "error"
 
@@ -225,6 +228,31 @@ add_specs suite_builder =
 
         group_builder.specify "a module method" <|
             Widget_Query.resolve_call Nothing spec_module spec_module "module_probe" ["arg"] subject_is_type=True . should_equal (answer "arg" Widget.Text_Input)
+
+    suite_builder.group "Widget_Query.resolve_call with an error as the subject" group_builder->
+        sample = Sample.Value "a label"
+        user_error = the_user_error
+        fails_with_error = Widget_Method.Value spec_module sample_type "fails_with_error"
+        # The inputs a failure is logged under for `subject`, as `resolve_call`
+        # builds them (with no search).
+        inputs_of subject uuids = ((Meta.type_of subject . to_text) . catch Any (_-> "<error>")) + "|" + uuids + "|"
+
+        group_builder.specify "answers no widget for every argument, runs no annotation and logs nothing" <|
+            uuids = '{"run":"' + Random.uuid + '"}'
+            failure = (Widget_Query.resolve_argument fails_with_error "arg" sample (_-> Nothing)).failure
+            # A plain subject's failure is logged, under the inputs this test builds.
+            _ = Widget_Query.resolve_call sample spec_module sample_type "fails_with_error" ["arg"] uuids
+            Widget_Query.log_failure failure (inputs_of sample uuids) . should_be_false
+            # The user's error answers no widget, and nothing was logged for it.
+            json = Widget_Query.resolve_call user_error spec_module sample_type "fails_with_error" ["arg", "other"] uuids
+            json . should_equal '{"arguments":[["arg",{"widget":null}],["other",{"widget":null}]]}'
+            Widget_Query.log_failure failure (inputs_of user_error uuids) . should_be_true
+
+        group_builder.specify "with subject_is_type, an error value still answers: the type is the subject" <|
+            Widget_Query.resolve_call user_error spec_module sample_type "probe" ["arg"] subject_is_type=True . should_equal (answer "arg" Widget.Boolean_Input)
+            Widget_Query.resolve_call user_error spec_module spec_module "module_probe" ["arg"] subject_is_type=True . should_equal (answer "arg" Widget.Text_Input)
+            error = error_of (Widget_Query.resolve_call user_error spec_module sample_type "fails_with_error" ["arg"] subject_is_type=True)
+            error.get "step" . should_equal "annotation"
 
     suite_builder.group "Widget_Query.resolve_call evaluates annotations as before" group_builder->
         sample = Sample.Value "a label"

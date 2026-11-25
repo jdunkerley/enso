@@ -163,6 +163,49 @@ test('mutual conversions keep the earlier member', () => {
   expect(composeUnion([m(TEXT, textInput), m(REGEX, regex)], both)).toEqual(textInput)
 })
 
+/** Conversions along `order`, each member to the next, the last back to the first. */
+const cycle =
+  (...order: string[]): Converts =>
+  (source, target) =>
+    order.includes(source) && order.indexOf(target) === (order.indexOf(source) + 1) % order.length
+
+const A = 'My.A'
+const B = 'My.B'
+const C = 'My.C'
+const D = 'My.D'
+const kindsOf = (config: ReturnType<typeof composeUnion>) =>
+  config != null && config !== 'pending' && config.kind === 'Union' ?
+    config.kinds.map((kind) => kind.label)
+  : config
+
+test.each([
+  ['A → B → C → A', [A, B, C], cycle(A, B, C)],
+  ['A → C → B → A', [A, B, C], cycle(A, C, B)],
+  ['A → B → C → D → A', [A, B, C, D], cycle(A, B, C, D)],
+])('a cycle of three or more (%s) keeps its earliest member alone', (_, order, conversions) => {
+  const members = order.map((type, i) => m(type, { kind: 'Numeric_Input', minimum: i }))
+  expect(composeUnion(members, conversions)).toEqual(members[0]!.config)
+  // Listed in another order, the earliest listed stays.
+  expect(composeUnion([...members].reverse(), conversions)).toEqual(members.at(-1)!.config)
+})
+
+test('a cycle beside an unrelated member keeps its earliest member and the other', () => {
+  const members = [A, B, C, D].map((type, i) => m(type, { kind: 'Numeric_Input', minimum: i }))
+  expect(kindsOf(composeUnion(members, cycle(A, B, C)))).toEqual(['A', 'D'])
+  expect(kindsOf(composeUnion([...members, nothing], cycle(B, C, D)))).toEqual([
+    'A',
+    'B',
+    'Nothing',
+  ])
+})
+
+test('a cycle converting on to a member outside it is absorbed by that member', () => {
+  const members = [A, B, C, D].map((type, i) => m(type, { kind: 'Numeric_Input', minimum: i }))
+  const conversions: Converts = (source, target) =>
+    cycle(A, B, C)(source, target) || (source === C && target === D)
+  expect(composeUnion(members, conversions)).toEqual(members[3]!.config)
+})
+
 test('equal widgets collapse into the first member', () => {
   expect(composeUnion([m(INTEGER, numeric), m(FLOAT, numeric)], none)).toEqual(numeric)
 })

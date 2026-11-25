@@ -208,7 +208,7 @@ export interface FileBrowse {
   kind: 'File_Browse'
   existing_only?: boolean | undefined
   action?: 'Open' | 'Save' | undefined
-  file_types?: FileType[] | undefined
+  file_types: FileType[]
 }
 
 export interface DateInput {
@@ -394,7 +394,7 @@ export const widgetConfigurationSchema: z.ZodType<WidgetConfiguration, z.ZodType
       ]),
     )
     .transform((config): WidgetConfiguration =>
-      config.kind === 'Union' ? toUnionConfig(config as RawUnion) : (config as WidgetConfiguration),
+      config.kind === 'Union' ? toUnionConfig(config) : config,
     )
 
 const argNameSchema = z.string()

@@ -32,6 +32,39 @@ describe('widgetQueryAnswerSchema', () => {
   test('rejects the old answer, a bare array of pairs', () => {
     expect(widgetQueryAnswerSchema.safeParse([['a', textInput]]).success).toBe(false)
   })
+
+  test.each(['Date_Input', 'Date_Time_Input', 'Time_Input'] as const)(
+    'an answer with a %s widget reaches the call configuration',
+    (kind) => {
+      // As `Widget.to_json` writes it: `{"constructor":"Date_Input"}`, inside the answer's JSON.
+      const json = JSON.stringify({ arguments: [['when', { widget: { constructor: kind } }]] })
+      const answer = widgetQueryAnswerSchema.parse(JSON.parse(json))
+      expect(functionCallFromAnswer(answer).parameters.get('when')).toEqual({ kind })
+    },
+  )
+
+  test('an answer with a File_Browse of an unknown action is rejected', () => {
+    const answer = {
+      arguments: [
+        [
+          'path',
+          {
+            widget: {
+              constructor: 'File_Browse',
+              existing_only: false,
+              action: 'Overwrite',
+              file_types: [],
+            },
+          },
+        ],
+      ],
+    }
+    expect(widgetQueryAnswerSchema.safeParse(answer).success).toBe(false)
+    answer.arguments[0]![1] = {
+      widget: { constructor: 'File_Browse', existing_only: false, action: 'Save', file_types: [] },
+    }
+    expect(widgetQueryAnswerSchema.safeParse(answer).success).toBe(true)
+  })
 })
 
 describe('column pickers in an answer', () => {

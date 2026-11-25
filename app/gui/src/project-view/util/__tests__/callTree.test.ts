@@ -491,6 +491,30 @@ test('an argument whose widget query failed carries the error, the others do not
   expect(WidgetQueryErrorKey in inputs.get('a')!).toBe(false)
 })
 
+test('an unset argument (a placeholder) whose widget query failed carries the error too', () => {
+  const ast = Ast.parseExpression('a.func x')!
+  const call = ArgumentApplication.FromInterpretedWithInfo(interpretCall(ast), {
+    suggestion: prefixFixture.mockSuggestion,
+    widgetCfg: {
+      kind: 'FunctionCall',
+      parameters: new Map(),
+      errors: new Map([['b', { step: 'resolver', message: 'boom' }]]),
+    },
+    subjectAsSelf: true,
+  })
+  assert(call instanceof ArgumentApplication)
+  const placeholder = [...call.iterApplications()]
+    .map((app) => app.argument)
+    .find((arg) => arg instanceof ArgumentPlaceholder && arg.argInfo.name === 'b')
+  assert(placeholder instanceof ArgumentPlaceholder)
+  expect(placeholder.toWidgetInput()[WidgetQueryErrorKey]).toEqual({
+    step: 'resolver',
+    message: 'boom',
+  })
+  // Its value is still the placeholder's: the error only marks it.
+  expect(placeholder.toWidgetInput().value).toBeUndefined()
+})
+
 describe('an argument without an annotation takes its type default', () => {
   const DATE = 'Standard.Base.Data.Time.Date.Date'
   const suggestion = makeModuleMethod('local.Foo.Bar.func', {

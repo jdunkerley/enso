@@ -190,6 +190,21 @@ function isPicker(config: WidgetConfiguration): config is ColumnPicker {
   )
 }
 
+/** The `from` of `picker` and of every picker nested in it (`''`: the call's subject), sorted. */
+function pickerSources(picker: ColumnPicker): string[] {
+  const found = new Set<string>()
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) value.forEach(walk)
+    else if (value != null && typeof value === 'object') {
+      if ('kind' in value && isPicker(value as WidgetConfiguration))
+        found.add((value as ColumnPicker).from ?? '')
+      Object.values(value).forEach(walk)
+    }
+  }
+  walk(picker)
+  return [...found].sort()
+}
+
 /** `array` with `f` applied to each element; the same array if no element changed. */
 function mapPreserving<T>(array: T[], f: (item: T) => T): T[] {
   let changed = false
@@ -203,8 +218,8 @@ function mapPreserving<T>(array: T[], f: (item: T) => T): T[] {
 
 /**
  * `config` with every picker reference, at any depth, replaced by its expansion. Memoised per
- * (source schema, picker); `cache` is per opened project. Returns `config` itself if it holds no
- * picker.
+ * (the schemas of every source the picker and the pickers nested in it read, picker); `cache` is per
+ * opened project. Returns `config` itself if it holds no picker.
  */
 export function expandColumnPickers(
   config: WidgetConfiguration,
@@ -248,7 +263,12 @@ function expandWith(
     const source = columns?.[from]
     const compute = () => expandNested(expandPicker(config, source))
     if (cache == null) return compute()
-    return cache.get(schemaKeyOf(from, source), JSON.stringify(config), compute)
+    // Keyed on every source the expansion reads: a picker nested in this one's `extra` may name
+    // another `from`, and its expansion must follow that source too.
+    const schemaKey = pickerSources(config)
+      .map((name) => `${name}=${schemaKeyOf(name, columns?.[name])}`)
+      .join('\n')
+    return cache.get(schemaKey, JSON.stringify(config), compute)
   }
   switch (config.kind) {
     case 'Single_Choice':
