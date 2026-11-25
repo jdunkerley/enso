@@ -7,10 +7,11 @@
 import type { UnionKind } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { kindIcon } from '@/components/GraphEditor/widgets/WidgetKindPicker/kindIcon'
 import { kindDefaultCode } from '@/components/GraphEditor/widgets/WidgetKindPicker/kindMatch'
-import { pickerMenuStyles } from '@/components/GraphEditor/widgets/WidgetSelection/styles'
+import { listMenuStyles } from '@/components/GraphEditor/widgets/WidgetSelection/styles'
 import SvgIcon from '@/components/SvgIcon.vue'
 import DropdownWidget, { type DropdownEntry } from '@/components/widgets/DropdownWidget.vue'
 import { unrefElement, useEvent } from '@/composables/events'
+import { injectGraphNavigator } from '@/providers/graphNavigator'
 import { usePopoverRoot } from '@/providers/popoverRoot'
 import { injectWidgetTree } from '@/providers/widgetTree'
 import { targetIsOutside } from '@/util/autoBlur'
@@ -24,6 +25,7 @@ const props = defineProps<{
 
 const tree = injectWidgetTree()
 const popoverRoot = usePopoverRoot()
+const graphNavigator = injectGraphNavigator(true)
 
 const chosen = computed<UnionKind | undefined>(() => props.kinds[props.chosenIndex])
 const selected = computed(() => tree.showDetails)
@@ -33,7 +35,11 @@ const icon = computed(() => (chosen.value ? kindIcon(chosen.value) : undefined))
 const open = ref(false)
 const buttonElement = useTemplateRef<HTMLElement>('buttonElement')
 const menuElement = useTemplateRef<HTMLElement>('menuElement')
-const { floatingStyles } = pickerMenuStyles(buttonElement, menuElement)
+/** The height below the button, in screen pixels; the list stops there and scrolls. */
+const availableHeight = ref<number>()
+const { floatingStyles } = listMenuStyles(buttonElement, menuElement, (height) => {
+  availableHeight.value = height
+})
 
 watch(selected, (isSelected) => {
   if (!isSelected) open.value = false
@@ -55,6 +61,22 @@ const entries = computed<KindEntry[]>(() =>
       ],
   ),
 )
+
+/**
+ * The list shows every kind (`--kind-count` rows), unless the window below the button is shorter:
+ * then it ends a margin above the window's edge (`--kind-list-max-height`, in the menu's own
+ * pixels, which the graph's zoom scales) and scrolls.
+ */
+const listVars = computed(() => {
+  const scale = graphNavigator?.scale ?? 1
+  const height = availableHeight.value
+  return {
+    '--kind-count': String(entries.value.length),
+    ...(height != null ?
+      { '--kind-list-max-height': `${Math.max(height / scale - LIST_BOTTOM_MARGIN_PX, 0)}px` }
+    : {}),
+  }
+})
 
 function closeMenu(refocus: boolean) {
   open.value = false
@@ -140,6 +162,9 @@ function onEntry(entry: KindEntry) {
  */
 let pendingFocus: { node: unknown; timer: ReturnType<typeof setTimeout> } | undefined
 
+/** The space kept between a list cut short by the window and the window's bottom edge. */
+const LIST_BOTTOM_MARGIN_PX = 8
+
 function clearPendingFocus() {
   if (pendingFocus) clearTimeout(pendingFocus.timer)
   pendingFocus = undefined
@@ -173,7 +198,7 @@ function clearPendingFocus() {
       <div
         ref="menuElement"
         class="menuElement widgetOutOfLayout"
-        :style="floatingStyles"
+        :style="[floatingStyles, listVars]"
         @keydown="onMenuKey"
       >
         <DropdownWidget class="outlined" :entries="entries" @clickEntry="onEntry" />
@@ -198,6 +223,14 @@ function clearPendingFocus() {
   padding: 0 calc(var(--widget-token-pad-unit) / 2);
   color: rgba(255 255 255 / 0.9);
   pointer-events: none;
+
+  /* Centred on the port, a bare icon's glyph (a band's letter or digit, ending at 11.25 of 16)
+     ended above the baseline of the text beside it; a pixel lower, it sits on it. The button's
+     icon stays centred in its pill. */
+  .kindSymbol {
+    position: relative;
+    top: 1px;
+  }
 }
 
 .kindButton {
@@ -240,5 +273,20 @@ function clearPendingFocus() {
 
 .outlined {
   border: 1px solid color-mix(in oklab, var(--dropdown-bg), black 5%);
+}
+
+/* Every kind, not the dropdown's usual 6.4 rows: a gallery of kinds is short enough to show whole.
+   The extra class outweighs the dropdown's own scoped `max-height`. */
+.menuElement :deep(.DropdownWidget .list) {
+  max-height: min(
+    calc(var(--kind-count) * var(--item-height) + 2 * var(--dropdown-padding)),
+    var(--kind-list-max-height, 100vh)
+  );
+}
+
+/* A kind without an icon (Nothing) lines its label up with the labels after the icons: an icon
+   row's label starts after the icon (16 px), its right margin (6 px) less its left margin (-4 px). */
+.menuElement :deep(.DropdownWidget .item:not(:has(.menu-icon)) .itemContent) {
+  margin-left: 18px;
 }
 </style>
