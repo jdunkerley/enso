@@ -1,4 +1,6 @@
 /* eslint-disable camelcase */
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { expect, test } from 'vitest'
 import { expandColumnPickers, expandPicker, prettyText, SchemaCache } from '../columnPickers'
 
@@ -29,16 +31,48 @@ test("prettyText matches Enso's Text.pretty", () => {
   expect(prettyText("it's")).toBe("'it\\'s'")
 })
 
-test('Column_Name: one option per column, values pretty', () => {
+const typed = (label: string, value: string, detail: string) => ({ ...opt(label, value), detail })
+
+test('Column_Name: one option per column, values pretty, each with its type', () => {
   expect(expandPicker(name, cols)).toEqual({
     kind: 'Single_Choice',
     values: [
-      opt('A', "'A'"),
-      opt('B C', "'B C'"),
-      opt('D "E"', '\'D "E"\''),
-      opt('F.G/H\\I', "'F.G/H\\\\I'"),
+      typed('A', "'A'", 'Integer'),
+      typed('B C', "'B C'", 'Char'),
+      typed('D "E"', '\'D "E"\'', 'Mixed'),
+      typed('F.G/H\\I', "'F.G/H\\\\I'", 'Date'),
     ],
   })
+})
+
+test("a column's type is shown beside every kind of picker's option, never in its value", () => {
+  const types = {
+    names: ['A', 'B'],
+    kinds: ['Numeric', 'Numeric'],
+    type_names: ['Decimal (38, 10)', ''],
+  } as const
+  const details = (config: unknown) =>
+    (config as { values: { detail?: string }[] }).values.map((v) => v.detail)
+  const ref = expandPicker({ ...name, reference: true }, types)
+  expect(details(ref)).toEqual(['Decimal (38, 10)', undefined])
+  expect(ref.kind === 'Single_Choice' && ref.values[0]!.value).toBe("(..Name 'A')")
+  expect(
+    details(expandPicker({ kind: 'Column_Names', ...base, regex: false, by_type: false }, types)),
+  ).toEqual(['Decimal (38, 10)', undefined])
+  const orderBy = expandPicker({ kind: 'Order_By', from: null, name_only: true }, types)
+  expect(details((orderBy as { item_editor: unknown }).item_editor)).toEqual([
+    'Decimal (38, 10)',
+    undefined,
+  ])
+})
+
+test('a type change alone is a new schema', () => {
+  const cache = new SchemaCache()
+  const first = expandColumnPickers(name, { '': cols }, cache)
+  const retyped = { ...cols, type_names: ['Float', 'Char', 'Mixed', 'Date'] }
+  const second = expandColumnPickers(name, { '': retyped }, cache)
+  expect(second).not.toBe(first)
+  expect(second.kind === 'Single_Choice' && second.values[0]!.detail).toBe('Float')
 })
 
 test("Column_Name with an expression option first (filter's column)", () => {
@@ -188,6 +222,60 @@ test('expandColumnPickers returns the identical object for the same schema', () 
   const second = expandColumnPickers({ ...name }, { '': { ...cols } }, cache)
   expect(second).toBe(first)
   expect(expandColumnPickers(name, { '': { ...cols, names: ['Z'] } }, cache)).not.toBe(first)
+})
+
+test('a picker nested in another picker, naming another source, follows that source', () => {
+  const cache = new SchemaCache()
+  // The outer picker reads the subject; one of its extras takes a column of `right`.
+  const outer = {
+    ...name,
+    extra: [opt('Other', '..Other', [['column', { ...name, from: 'right' }]])],
+  } as const
+  const right = (names: string[]) =>
+    ({ names, kinds: names.map(() => 'Textual'), type_names: names.map(() => 'Char') }) as const
+  const nestedValues = (expanded: unknown) =>
+    (expanded as any).values
+      .find((choice: { label: string }) => choice.label === 'Other')
+      .parameters[0][1].values.map((choice: { label: string }) => choice.label)
+  const first = expandColumnPickers(outer as never, { '': cols, right: right(['X']) }, cache)
+  expect(nestedValues(first)).toEqual(['X'])
+  // Only `right` changes: the subject's schema is the same, but the expansion is not.
+  const second = expandColumnPickers(outer as never, { '': cols, right: right(['Y']) }, cache)
+  expect(nestedValues(second)).toEqual(['Y'])
+  // And back: the first expansion is reused.
+  expect(expandColumnPickers(outer as never, { '': cols, right: right(['X']) }, cache)).toBe(first)
+})
+
+test("prettyText escapes exactly what Enso's Core_Text_Utils.prettyPrint does", () => {
+  // Read the escapes from the Java source, so a change on either side fails here.
+  const java = fs.readFileSync(
+    path.resolve(
+      __dirname,
+      '../../../../../../../lib/scala/common-polyglot-core-utils/src/main/java/org/enso/polyglot/common_utils/Core_Text_Utils.java',
+    ),
+    'utf-8',
+  )
+  const body = java.slice(java.indexOf('String prettyPrint('))
+  // The value of a Java char or string literal's text (only the escapes this method uses).
+  const JAVA_ESCAPES: Record<string, string> = { n: '\n', t: '\t', r: '\r', '0': '\0' }
+  const unescape = (literal: string) =>
+    literal.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (_, escape: string) =>
+      escape.length === 5 ?
+        String.fromCharCode(parseInt(escape.slice(1), 16))
+      : (JAVA_ESCAPES[escape] ?? escape),
+    )
+  const cases = [
+    ...body.matchAll(
+      /case '((?:[^'\\]|\\.|\\u[0-9a-fA-F]{4})+)' -> sb\.append\("((?:[^"\\]|\\.)*)"\);/g,
+    ),
+  ].map(([, char, escaped]) => [unescape(char!), unescape(escaped!)] as const)
+  expect(cases.length).toBe(11)
+  for (const [char, escaped] of cases)
+    expect(prettyText(char), JSON.stringify(char)).toBe(`'${escaped}'`)
+  // Any other control character is written as it is: `default -> sb.append(c)`.
+  expect(body).toContain('default -> sb.append(c);')
+  expect(prettyText('a\u0001b')).toBe("'a\u0001b'")
+  expect(prettyText('\u007f\u0085')).toBe("'\u007f\u0085'")
 })
 
 test('the least recently used schema is dropped', () => {

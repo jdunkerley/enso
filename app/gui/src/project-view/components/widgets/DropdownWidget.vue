@@ -166,6 +166,8 @@ export interface DropdownEntry {
   readonly key?: string | undefined
   readonly selected: boolean
   readonly icon?: Icon | undefined
+  /** A quiet note at the entry's right (a column's type). It gives way to the value when space is short. */
+  readonly detail?: string | undefined
 }
 </script>
 
@@ -189,6 +191,14 @@ export interface DropdownEntry {
         >
           <SvgIcon v-if="entry.icon" :name="entry.icon" class="menu-icon" />
           <span class="itemContent" v-text="entry.value"></span>
+          <!-- Not part of the entry's accessible name, which stays its value (the column's name). -->
+          <span
+            v-if="entry.detail"
+            class="itemDetail"
+            aria-hidden="true"
+            :title="entry.detail"
+            v-text="entry.detail"
+          ></span>
         </button>
       </li>
     </ul>
@@ -296,6 +306,19 @@ export interface DropdownEntry {
   margin: 3px 0;
   text-wrap: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Right-aligned and muted. Its minimum width is zero while the value's is its own width (up to the
+   whole item), so a long type is cut short before the value is. */
+.itemDetail {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  padding-left: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.6;
 }
 
 .menu-icon {

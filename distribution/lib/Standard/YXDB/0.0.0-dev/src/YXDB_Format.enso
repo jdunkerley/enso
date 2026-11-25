@@ -10,6 +10,7 @@ import Standard.Base.System.File_Format.File_Name_Pattern
 import Standard.Base.System.File_Format_Metadata.File_Format_Metadata
 import Standard.Base.System.Input_Stream.Input_Stream
 from Standard.Base.Metadata.Choice import Option
+import Standard.Base.Metadata.Column_Kind.Column_Kind
 import Standard.Base.Metadata.Widget
 
 import Standard.Table.Internal.Java_Problems
@@ -55,11 +56,12 @@ type YXDB_Format
 
        ## Arguments
        - table: The table containing the spatial objects.
-       - column: The name of the column containing the spatial objects.
+       - column: The name of the column containing the spatial objects. A
+         column of any other kind fails on its first value.
 
        ## Returns
        An updated table with the specified column converted to GeoJSON.
-    @column (Widget.Column_Name from="table")
+    @column (Widget.Column_Name kinds=[Column_Kind.Other] from="table")
     spatial_column_to_geojson (table : Table & In_Memory_Table = Missing_Argument.throw "table") (column : Text | Integer = Missing_Argument.throw "column") =
         input_column = table.at column
         converted_column = input_column.map v-> YXDB_Format.spatial_to_geojson v

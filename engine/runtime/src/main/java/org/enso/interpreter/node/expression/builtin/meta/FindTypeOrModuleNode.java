@@ -19,7 +19,7 @@ public class FindTypeOrModuleNode extends Node {
     if (type != null) {
       return type;
     }
-    var error = ctx.getBuiltins().error().makeModuleDoesNotExistError(qualifiedName.toString());
+    var error = ctx.getBuiltins().error().makeNoSuchType(qualifiedName.toString());
     return DataflowError.withDefaultTrace(error, this);
   }
 }

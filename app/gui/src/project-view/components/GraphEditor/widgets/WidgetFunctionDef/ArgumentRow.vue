@@ -9,6 +9,7 @@ import {
 import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
 import { proxyRefs } from '$/utils/reactivity'
 import { EnsoExpression } from '@/components/GraphEditor/widgets/WidgetEnsoExpression.vue'
+import { defaultValueConfig } from '@/components/GraphEditor/widgets/WidgetFunctionDef/defaultValueConfig'
 import {
   createDefaultExpressionOfKind,
   getArgumentDefaultKind,
@@ -125,9 +126,7 @@ const nodeDefault = computed((): TreeProps | undefined => {
     input: {
       ...WidgetInput.FromAstOrPlaceholder(expr, () => syntheticId),
       expectedType,
-      // Without a frame to ask in, the type default is not looked up.
-      dynamicConfig:
-        frame != null ? openedProject.typeDefaults.value.lookup(expectedType, frame) : undefined,
+      dynamicConfig: defaultValueConfig(openedProject.typeDefaults.value, expectedType, frame),
       [EnsoExpression]: {
         weakMatch: true,
       },

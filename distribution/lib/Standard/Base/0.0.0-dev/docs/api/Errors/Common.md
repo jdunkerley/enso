@@ -82,6 +82,9 @@
     - Error target:Standard.Base.Any.Any symbol:Standard.Base.Any.Any
     - method_name self -> Standard.Base.Any.Any
     - to_display_text self -> Standard.Base.Any.Any
+- type No_Such_Type
+    - Error name:Standard.Base.Any.Any
+    - to_display_text self -> Standard.Base.Any.Any
 - type Not_Found
     - to_display_text self -> Standard.Base.Any.Any
 - type Not_Invokable

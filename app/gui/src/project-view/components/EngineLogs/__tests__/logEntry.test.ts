@@ -13,6 +13,21 @@ test('parses the start of an entry', () => {
   })
 })
 
+test('a lower-case level parses too, as the enso CLI writes it', () => {
+  // `[%level{lowercase=true}] [%d{yyyy-MM-dd'T'HH:mm:ssXXX}] [%logger] %msg%n`
+  const LOG = '[warn] [2026-11-25T08:15:02+01:00] [org.enso.interpreter.Runtime] Slow start'
+  expect(parseEntry(LOG)).toEqual({
+    level: LOG_LEVELS.indexOf('WARN'),
+    timestamp: new Date('2026-11-25T07:15:02Z'),
+    module: 'org.enso.interpreter.Runtime',
+    event: 'Slow start',
+  })
+  for (const [index, level] of LOG_LEVELS.entries()) {
+    expect(parseEntry(`[${level.toLowerCase()}] [2026-04-14T09:28:02Z] [a.b] c`)?.level).toBe(index)
+  }
+  expect(parseEntry('[notice] [2026-04-14T09:28:02Z] [x] y')).toBeUndefined()
+})
+
 test('a line that starts no entry is not one', () => {
   expect(parseEntry('    at org.enso.Foo.bar(Foo.java:12)')).toBeUndefined()
   expect(parseEntry('[NOTICE] [2026-04-14T09:28:02.655] [x] y')).toBeUndefined()

@@ -88,7 +88,7 @@ testProjects:
   SQLite_Tests:
     imports: [Base, Database, Database_Test_Suite, SQLite, Table, Test]
     loads: [AWS, DuckDB, Microsoft, Postgres, Snowflake]
-    testImports: [Base_Tests]
+    testImports: [Base_Tests, Helpers]
   Snowflake_Tests:
     imports: [Base, Database, Database_Test_Suite, Snowflake, Table, Test]
     testImports: [Base_Tests, Cloud_Tests]
@@ -107,7 +107,7 @@ testProjects:
         Test,
         Visualization,
       ]
-    testImports: [Base_Tests, Cloud_Tests, Test_Tests]
+    testImports: [Base_Tests, Cloud_Tests, Helpers, Test_Tests]
   Tableau_Tests:
     imports: [Base, Database_Test_Suite, Table, Tableau, Test]
     testImports: []

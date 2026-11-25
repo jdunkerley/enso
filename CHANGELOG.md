@@ -4,6 +4,7 @@
 
 - [Argument dropdowns can be used from the keyboard: the arrow keys move through
   the entries, also while typing to filter them, and Enter chooses one.][953]
+- [Column dropdowns show each column's type beside its name.][949]
 - [Table expressions suggest the values an argument takes: typing
   `cast([Value], ..` lists the value types to cast to.][941]
 - [Widgets that depend on other arguments (join conditions, filter values,
@@ -518,6 +519,8 @@
 
 #### Enso Standard Library
 
+- [`YXDB_Format.spatial_column_to_geojson` offers only spatial columns in its
+  column dropdown, not the numbers and text beside them.][951]
 - [Selecting a node shows the arguments you most often change: `format` on
   `Data.read`, `Data.read_many` and `File.read`, `name_filter` on `Data.list`
   and `as` on `Table.set`.][940]
@@ -619,8 +622,10 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [953]: https://github.com/jdunkerley/enso/pull/953
+[949]: https://github.com/jdunkerley/enso/pull/949
 [940]: https://github.com/jdunkerley/enso/pull/940
 [941]: https://github.com/jdunkerley/enso/pull/941
+[951]: https://github.com/jdunkerley/enso/pull/951
 [933]: https://github.com/jdunkerley/enso/pull/933
 [926]: https://github.com/jdunkerley/enso/pull/926
 [917]: https://github.com/jdunkerley/enso/pull/917
