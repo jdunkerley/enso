@@ -134,6 +134,14 @@ render only its own slot content. The icon is already on the row, drawn by
     stale frames back off and are retried choosing a frame again. Until some
     frame executes, an un-annotated argument shows no widget; the first
     appearance of a type costs one round trip.
+  - **A method's argument types are asked before its arguments render** (spec
+    §6): `TypeDefaults.prefetch` starts the queries of the types not known or in
+    flight, reading nothing reactively. The component browser calls it for the
+    entry it shows (selected, or applied while its arguments are typed), so a
+    node placed from it has its widgets as soon as the engine names its call;
+    `useWidgetFunctionCallInfo` calls it once a call is known, for every
+    argument, the ones not shown included. One query per type: the engine's
+    `resolve_type` takes one.
 - `WidgetDate.vue` — a dropdown wrapper for an input configured `Date_Input`
   (vector items included) and for a whole node that is
   `Date.today`/`yesterday`/`tomorrow` or `Date.new` with any arguments
