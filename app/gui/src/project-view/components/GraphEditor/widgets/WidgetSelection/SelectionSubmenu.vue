@@ -131,6 +131,7 @@ export interface SubmenuComponent {
           v-if="props.show"
           class="outlined"
           :entries="entries"
+          :keyboard="props.topLevel === true"
           @clickEntry="onClick"
           @scroll="onScroll"
         />

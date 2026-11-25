@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [Argument dropdowns can be used from the keyboard: the arrow keys move through
+  the entries, also while typing to filter them, and Enter chooses one.][953]
 - [The list of kinds a union argument offers shows every kind without scrolling,
   the kind icons sit on the text's baseline, the whole-number icon is redrawn to
   read at small sizes, and a `regex '…'` value is outlined as one value
@@ -626,6 +628,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[953]: https://github.com/jdunkerley/enso/pull/953
 [949]: https://github.com/jdunkerley/enso/pull/949
 [940]: https://github.com/jdunkerley/enso/pull/940
 [941]: https://github.com/jdunkerley/enso/pull/941

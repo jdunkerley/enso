@@ -836,6 +836,64 @@ test('Selection widget with text widget as input', async ({ editorPage, page }) 
   await expect(pathDropdown.dropDown).toBeHidden()
 })
 
+test('Selection widget: the arrow keys move the highlight and Enter chooses', async ({
+  editorPage,
+  page,
+}) => {
+  const node = await dataReadNodeWithMethodCallInfo(editorPage)
+  const topLevelArgs = node.locator('.WidgetTopLevelArgument')
+  await actions.showHiddenArguments(page, node)
+  await expect(topLevelArgs).toHaveCount(3)
+  const onProblemsArg = topLevelArgs.filter({ has: page.getByText('on_problems') })
+  await onProblemsArg.click()
+  const dropDown = new DropDownLocator(onProblemsArg)
+  await dropDown.expectVisibleWithOptions(['..Ignore', '..Report_Warning', '..Report_Error'])
+  const highlighted = dropDown.dropDown.locator('.item.highlighted')
+  await expect(highlighted).toHaveCount(0)
+  // Nothing is chosen yet: Down starts at the top, and Up from the top wraps to the bottom.
+  await page.keyboard.press('ArrowDown')
+  await expect(highlighted).toHaveText('..Ignore')
+  await page.keyboard.press('ArrowUp')
+  await expect(highlighted).toHaveText('..Report_Error')
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('ArrowDown')
+  await expect(highlighted).toHaveText('..Report_Warning')
+  // The mouse moves the same highlight, and the keys go on from where it left it.
+  await dropDown.item('..Ignore').hover()
+  await expect(highlighted).toHaveText('..Ignore')
+  await page.keyboard.press('ArrowDown')
+  await expect(highlighted).toHaveText('..Report_Warning')
+  await page.keyboard.press('Enter')
+  await dropDown.expectNotVisible()
+  await expect(onProblemsArg.locator('.WidgetToken')).toContainText(['..', 'Report_Warning'])
+  expect(await moduleCode(page)).toMatch(/data = Data\.read .*on_problems=\.\.Report_Warning\n/)
+
+  // With the dropdown filtered by typing, the keys move among the entries left.
+  const pathArg = topLevelArgs.filter({ has: page.getByText('path') })
+  const pathDropDown = new DropDownLocator(pathArg)
+  const pathInput = pathArg.getByTestId('widget-text-content')
+  await pathArg.click()
+  await pathDropDown.clickOption('File 1')
+  await expect(pathInput).toHaveText('File 1')
+  await pathInput.click()
+  await pathDropDown.expectVisibleWithOptions([...CHOOSE_FILE_OPTIONS, 'File 1', 'File 2'])
+  await page.keyboard.insertText('File')
+  await pathDropDown.expectVisibleWithOptions(['File 1', 'File 2'])
+  await page.keyboard.press('ArrowUp')
+  await expect(pathDropDown.dropDown.locator('.item.highlighted')).toHaveText('File 2')
+  await page.keyboard.press('Enter')
+  await expect(pathInput).toHaveText('File 2')
+  await expect(pathDropDown.dropDown).toBeHidden()
+
+  // Escape still closes the dropdown after the keys have moved the highlight.
+  await onProblemsArg.click()
+  await dropDown.expectVisible()
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Escape')
+  await dropDown.expectNotVisible()
+  await expect(onProblemsArg.locator('.WidgetToken')).toContainText(['..', 'Report_Warning'])
+})
+
 test('File Browser widget', async ({ editorPage, page }) => {
   await editorPage
   await mockMethodCallInfo(page, 'data', {
