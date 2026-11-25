@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [An argument that takes a value or a list of them, such as
+  `Text | Vector Text`, offers the list as a kind of its own. Switching from a
+  text to the list wraps the text in a list, and switching back keeps a single
+  text.][960]
 - [A component placed from the component browser shows its arguments' widgets
   (pickers, dropdowns) as soon as it appears, instead of showing the bare
   argument names for a moment first.][952]
@@ -622,6 +626,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[960]: https://github.com/jdunkerley/enso/pull/960
 [949]: https://github.com/jdunkerley/enso/pull/949
 [940]: https://github.com/jdunkerley/enso/pull/940
 [941]: https://github.com/jdunkerley/enso/pull/941
