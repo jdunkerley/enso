@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [Argument dropdowns can be used from the keyboard: the arrow keys move through
+  the entries, also while typing to filter them, and Enter chooses one.][953]
 - [Table expressions suggest the values an argument takes: typing
   `cast([Value], ..` lists the value types to cast to.][941]
 - [Widgets that depend on other arguments (join conditions, filter values,
@@ -616,6 +618,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[953]: https://github.com/jdunkerley/enso/pull/953
 [940]: https://github.com/jdunkerley/enso/pull/940
 [941]: https://github.com/jdunkerley/enso/pull/941
 [933]: https://github.com/jdunkerley/enso/pull/933
